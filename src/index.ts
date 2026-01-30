@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { Client, type SetActivity } from "@xhayper/discord-rpc"
 
-const DEFAULT_CLIENT_ID = "1334049498592313364"
+const DEFAULT_CLIENT_ID = "1462270555586822206"
 const RECONNECT_DELAY = 5000
 const MAX_RETRIES = 10
 
@@ -73,8 +73,10 @@ class DiscordRPC {
     const activity: SetActivity = {
       details,
       state,
-      largeImageKey: "opencode-logo",
-      largeImageText: "OpenCode",
+      largeImageKey: "opencode_rp_large_dark_1024",
+      largeImageText: "OpenCode - AI Coding Assistant",
+      smallImageKey: "opencode_icon_tight_dark_1024",
+      smallImageText: details,
     }
 
     if (this.sessionStart) {
