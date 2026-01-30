@@ -11,7 +11,7 @@
  */
 
 import { Client, type SetActivity } from "@xhayper/discord-rpc"
-import type { PresenceState } from "../types"
+import type { PresenceState } from "../types/index.js"
 
 /** Reconnection configuration */
 const RECONNECT_BASE_DELAY_MS = 5000

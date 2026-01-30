@@ -1,3 +1,3 @@
-import { OpenCodeDiscordPresence } from "./plugin"
+import { OpenCodeDiscordPresence } from "./plugin.js"
 
 export default OpenCodeDiscordPresence

@@ -6,7 +6,7 @@
  * Configuration is typically passed from opencode.json.
  */
 
-import type { DiscordPresenceConfig } from "./types"
+import type { DiscordPresenceConfig } from "./types/index.js"
 
 /**
  * Default Discord Application ID

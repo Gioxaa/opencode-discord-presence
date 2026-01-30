@@ -1,4 +1,4 @@
-import type { Locale } from "./ko"
+import type { Locale } from "./ko.js"
 
 export const en: Locale = {
   code: "en",

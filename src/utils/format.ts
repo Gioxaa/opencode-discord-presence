@@ -6,7 +6,7 @@
  * in a user-friendly way for Discord Rich Presence.
  */
 
-import type { ModelInfo, TokenCount } from "../types"
+import type { ModelInfo, TokenCount } from "../types/index.js"
 
 /**
  * Format token count for display

@@ -11,12 +11,12 @@
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
-import { getConfig, validateConfig } from "./config"
-import { getLocale } from "./i18n"
-import { DiscordRPCService } from "./services/discord-rpc"
-import type { DiscordPresenceConfig, TokenCount } from "./types"
-import { formatModelName, formatTokens } from "./utils/format"
-import { getProjectName } from "./utils/project"
+import { getConfig, validateConfig } from "./config.js"
+import { getLocale } from "./i18n/index.js"
+import { DiscordRPCService } from "./services/discord-rpc.js"
+import type { DiscordPresenceConfig, TokenCount } from "./types/index.js"
+import { formatModelName, formatTokens } from "./utils/format.js"
+import { getProjectName } from "./utils/project.js"
 
 /**
  * OpenCode Discord Presence Plugin

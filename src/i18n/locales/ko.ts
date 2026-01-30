@@ -1,4 +1,4 @@
-import { withParticle } from "../../utils/particle"
+import { withParticle } from "../../utils/particle.js"
 
 export interface Locale {
   code: string

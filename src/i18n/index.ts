@@ -1,7 +1,7 @@
-import { en } from "./locales/en"
-import { ja } from "./locales/ja"
-import { ko, type Locale } from "./locales/ko"
-import { zh } from "./locales/zh"
+import { en } from "./locales/en.js"
+import { ja } from "./locales/ja.js"
+import { ko, type Locale } from "./locales/ko.js"
+import { zh } from "./locales/zh.js"
 
 export type SupportedLanguage = "ko" | "en" | "ja" | "zh" | "auto"
 
@@ -40,4 +40,4 @@ export function getAvailableLanguages(): Array<{ code: string; name: string }> {
   }))
 }
 
-export type { Locale } from "./locales/ko"
+export type { Locale } from "./locales/ko.js"
