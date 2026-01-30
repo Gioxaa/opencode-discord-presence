@@ -1,6 +1,6 @@
 import type { PresenceConfig } from "./types/index.js"
 
-export const DEFAULT_CLIENT_ID = "1334049498592313364"
+export const DEFAULT_CLIENT_ID = "1466770544748662819"
 
 export function getConfig(): PresenceConfig {
   return {
