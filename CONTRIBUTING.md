@@ -14,7 +14,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ```bash
 # Clone the repository
-git clone https://github.com/Puri12/opencode-rich-presence-server.git
+git clone https://github.com/Puri12/opencode-rich-presence.git
 cd opencode-discord-presence
 
 # Install dependencies
