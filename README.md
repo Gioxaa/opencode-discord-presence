@@ -3,6 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/opencode-discord-presence.svg)](https://www.npmjs.com/package/opencode-discord-presence)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+[한국어](README.ko.md) | English
+
 Display your current OpenCode session status in Discord Rich Presence. Show which AI agent you're using, the current model, session time, and more.
 
 ## Features
