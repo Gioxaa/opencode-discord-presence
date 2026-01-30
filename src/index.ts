@@ -25,5 +25,12 @@
  * ```
  */
 
+export { getAvailableLanguages, getLocale, supportedLanguages } from "./i18n"
 export { OpenCodeDiscordPresence } from "./plugin"
-export type { DiscordPresenceConfig, ModelInfo, PresenceState, TokenCount } from "./types"
+export type {
+  DiscordPresenceConfig,
+  ModelInfo,
+  PresenceState,
+  SupportedLanguage,
+  TokenCount,
+} from "./types"
