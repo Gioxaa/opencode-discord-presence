@@ -26,7 +26,7 @@
  */
 
 export { getAvailableLanguages, getLocale, supportedLanguages } from "./i18n"
-export { OpenCodeDiscordPresence } from "./plugin"
+export { OpenCodeDiscordPresence, OpenCodeDiscordPresence as default } from "./plugin"
 export type {
   DiscordPresenceConfig,
   ModelInfo,
