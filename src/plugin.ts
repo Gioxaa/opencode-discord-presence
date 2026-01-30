@@ -26,7 +26,6 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
   return {
     "chat.message": async (input) => {
-      console.log("[discord-presence] DEBUG input:", JSON.stringify(input, null, 2))
       if (input.agent) currentAgent = input.agent
       if (input.model?.modelID) currentModel = input.model.modelID
       await updatePresence(false)

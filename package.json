@@ -1,6 +1,6 @@
 {
   "name": "opencode-discord-presence",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Discord Rich Presence plugin for OpenCode - Display your current AI agent, model, and status in Discord",
   "type": "module",
   "main": "dist/index.js",
