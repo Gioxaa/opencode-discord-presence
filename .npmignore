@@ -1,0 +1,22 @@
+# Source files (only dist/ is published)
+src/
+scripts/
+
+# Test files
+*.test.ts
+**/*.test.ts
+
+# Config files
+tsconfig.json
+biome.json
+bun.lock
+
+# Development files
+.github/
+.sisyphus/
+.env*
+.DS_Store
+
+# Documentation (README and LICENSE are included via package.json "files")
+CONTRIBUTING.md
+CHANGELOG.md
