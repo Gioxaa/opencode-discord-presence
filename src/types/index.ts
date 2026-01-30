@@ -4,6 +4,16 @@
  */
 
 /**
+ * Supported languages for the plugin UI
+ * - "auto": Detect from system locale
+ * - "ko": Korean
+ * - "en": English
+ * - "ja": Japanese
+ * - "zh": Chinese (Simplified)
+ */
+export type SupportedLanguage = "auto" | "ko" | "en" | "ja" | "zh"
+
+/**
  * Configuration options for the Discord Rich Presence plugin
  */
 export interface DiscordPresenceConfig {
@@ -17,6 +27,8 @@ export interface DiscordPresenceConfig {
   showTokenUsage: boolean
   /** Show current project name */
   showProjectName: boolean
+  /** Language for presence messages (default: "auto") */
+  language: SupportedLanguage
 }
 
 /**
