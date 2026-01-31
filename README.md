@@ -12,8 +12,6 @@ Display your current OpenCode session status in Discord Rich Presence. Show whic
 - **Real-time agent display** - Shows which AI agent (Claude, Prometheus, etc.) you're currently using
 - **Model information** - Displays the active model (Claude Sonnet, GPT-4, etc.)
 - **Session time tracking** - Shows how long you've been coding
-- **Token usage** - Track input/output tokens consumed in your session
-- **Project name** - Display your current project from Git or directory
 - **Korean language support** - Proper Korean particle handling (을/를, 은/는)
 - **Idle detection** - Automatically shows when you're taking a break
 
@@ -44,19 +42,22 @@ That's it! The plugin will automatically connect to Discord and display your ses
 
 ## Configuration
 
-Customize the plugin behavior in your `opencode.json`:
+Create a `.discord-presence.json` file in your home directory or project root:
 
 ```json
 {
-  "plugins": ["opencode-discord-presence"],
-  "discordPresence": {
-    "enabled": true,
-    "applicationId": "YOUR_DISCORD_APP_ID",
-    "showSessionTime": true,
-    "showTokenUsage": true,
-    "showProjectName": true
-  }
+  "enabled": true,
+  "applicationId": "YOUR_DISCORD_APP_ID",
+  "language": "ko"
 }
+```
+
+Or use environment variables:
+
+```bash
+OPENCODE_DISCORD_ENABLED=true
+OPENCODE_DISCORD_CLIENT_ID=YOUR_APP_ID
+OPENCODE_DISCORD_LANGUAGE=ko
 ```
 
 ### Configuration Options
@@ -65,9 +66,13 @@ Customize the plugin behavior in your `opencode.json`:
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `true` | Enable or disable the plugin |
 | `applicationId` | `string` | (built-in) | Custom Discord Application ID for your own branding |
-| `showSessionTime` | `boolean` | `true` | Show elapsed time since session start |
-| `showTokenUsage` | `boolean` | `true` | Display token usage (e.g., "12.5k tokens") |
-| `showProjectName` | `boolean` | `true` | Show current project name from Git/directory |
+| `language` | `string` | `"en"` | Display language (`"en"` or `"ko"`) |
+
+### Config File Priority
+
+1. Project directory: `.discord-presence.json`
+2. Home directory: `~/.discord-presence.json`
+3. Environment variables
 
 ## Custom Discord Application
 
@@ -93,14 +98,16 @@ For custom branding (your own images and app name):
 The plugin hooks into OpenCode's event system:
 
 - **chat.message** - Updates presence when you send/receive messages, tracking the current agent and model
-- **event** - Listens for session state changes (idle, active) and token usage updates
+- **event** - Listens for session state changes (idle, active)
 
 ### Presence States
 
-| State | Display | Description |
-|-------|---------|-------------|
-| Active | "Prometheus를 갈구는중" | You're actively coding with an agent |
-| Idle | "Prometheus는 휴식중" | Session is idle |
+| State | English | Korean | Description |
+|-------|---------|--------|-------------|
+| Active | "Working with Prometheus" | "Prometheus를 갈구는중" | You're actively coding with an agent |
+| Idle | "Prometheus is idle" | "Prometheus는 휴식중" | Session is idle |
+
+Korean particles (을/를, 은/는) are automatically selected based on whether the agent name ends with a consonant (받침).
 
 ## Development
 
@@ -139,9 +146,7 @@ src/
 ├── services/
 │   └── discord-rpc.ts    # Discord RPC service (singleton)
 └── utils/
-    ├── format.ts         # Token & model name formatting
-    ├── particle.ts       # Korean particle detection
-    └── project.ts        # Project name detection
+    └── particle.ts       # Korean particle handling (을/를, 은/는)
 ```
 
 ## Contributing

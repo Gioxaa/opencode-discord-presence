@@ -10,9 +10,7 @@ OpenCode 세션 상태를 Discord Rich Presence로 표시합니다. 현재 사�
 - **실시간 에이전트 표시** - 현재 사용 중인 AI 에이전트 (Claude, Prometheus 등) 표시
 - **모델 정보** - 활성 모델 표시 (Claude Sonnet, GPT-4 등)
 - **세션 시간 추적** - 코딩 시간 표시
-- **토큰 사용량** - 세션에서 사용한 입출력 토큰 추적
-- **프로젝트 이름** - Git 또는 디렉토리에서 현재 프로젝트 이름 표시
-- **다국어 지원** - 한국어, 영어, 일본어, 중국어 지원
+- **한국어 지원** - 한국어 조사 자동 처리 (을/를, 은/는)
 - **유휴 감지** - 휴식 중일 때 자동으로 상태 변경
 
 ## 설치
@@ -42,20 +40,22 @@ pnpm add opencode-discord-presence
 
 ## 설정
 
-`opencode.json`에서 플러그인 동작을 커스터마이즈할 수 있습니다:
+홈 디렉토리 또는 프로젝트 루트에 `.discord-presence.json` 파일을 생성하세요:
 
 ```json
 {
-  "plugins": ["opencode-discord-presence"],
-  "discordPresence": {
-    "enabled": true,
-    "applicationId": "YOUR_DISCORD_APP_ID",
-    "showSessionTime": true,
-    "showTokenUsage": true,
-    "showProjectName": true,
-    "language": "ko"
-  }
+  "enabled": true,
+  "applicationId": "YOUR_DISCORD_APP_ID",
+  "language": "ko"
 }
+```
+
+또는 환경변수를 사용할 수 있습니다:
+
+```bash
+OPENCODE_DISCORD_ENABLED=true
+OPENCODE_DISCORD_CLIENT_ID=YOUR_APP_ID
+OPENCODE_DISCORD_LANGUAGE=ko
 ```
 
 ### 설정 옵션
@@ -64,10 +64,13 @@ pnpm add opencode-discord-presence
 |------|------|--------|------|
 | `enabled` | `boolean` | `true` | 플러그인 활성화/비활성화 |
 | `applicationId` | `string` | (내장) | 커스텀 브랜딩을 위한 Discord Application ID |
-| `showSessionTime` | `boolean` | `true` | 세션 시작 이후 경과 시간 표시 |
-| `showTokenUsage` | `boolean` | `true` | 토큰 사용량 표시 (예: "12.5k 토큰") |
-| `showProjectName` | `boolean` | `true` | Git/디렉토리에서 현재 프로젝트 이름 표시 |
-| `language` | `string` | `"auto"` | 언어 설정 (`"auto"`, `"ko"`, `"en"`, `"ja"`, `"zh"`) |
+| `language` | `string` | `"en"` | 표시 언어 (`"en"` 또는 `"ko"`) |
+
+### 설정 파일 우선순위
+
+1. 프로젝트 디렉토리: `.discord-presence.json`
+2. 홈 디렉토리: `~/.discord-presence.json`
+3. 환경변수
 
 ## 커스텀 Discord Application
 
@@ -93,23 +96,16 @@ pnpm add opencode-discord-presence
 플러그인은 OpenCode의 이벤트 시스템에 연결됩니다:
 
 - **chat.message** - 메시지 송수신 시 현재 에이전트와 모델을 추적하여 presence 업데이트
-- **event** - 세션 상태 변경 (유휴, 활성) 및 토큰 사용량 업데이트 감지
+- **event** - 세션 상태 변경 (유휴, 활성) 감지
 
 ### Presence 상태
 
-| 상태 | 표시 | 설명 |
-|------|------|------|
-| 활성 | "Prometheus를 갈구는중" | 에이전트로 활발히 코딩 중 |
-| 유휴 | "Prometheus는 휴식중" | 세션이 유휴 상태 |
+| 상태 | 영어 | 한국어 | 설명 |
+|------|------|--------|------|
+| 활성 | "Working with Prometheus" | "Prometheus를 갈구는중" | 에이전트로 활발히 코딩 중 |
+| 유휴 | "Prometheus is idle" | "Prometheus는 휴식중" | 세션이 유휴 상태 |
 
-### 지원 언어
-
-| 언어 | 코드 | 활성 상태 예시 |
-|------|------|---------------|
-| 한국어 | `ko` | "Prometheus를 갈구는중" |
-| English | `en` | "Working with Prometheus" |
-| 日本語 | `ja` | "Prometheusで作業中" |
-| 中文 | `zh` | "正在使用 Prometheus" |
+한국어 조사 (을/를, 은/는)는 에이전트 이름의 받침 유무에 따라 자동으로 선택됩니다.
 
 ## 개발
 
@@ -145,15 +141,10 @@ src/
 ├── config.ts             # 설정 관리
 ├── types/
 │   └── index.ts          # TypeScript 타입 정의
-├── i18n/
-│   ├── index.ts          # 다국어 지원
-│   └── locales/          # 언어별 번역 파일
 ├── services/
 │   └── discord-rpc.ts    # Discord RPC 서비스 (싱글톤)
 └── utils/
-    ├── format.ts         # 토큰 & 모델명 포맷팅
-    ├── particle.ts       # 한국어 조사 처리
-    └── project.ts        # 프로젝트 이름 감지
+    └── particle.ts       # 한국어 조사 처리 (을/를, 은/는)
 ```
 
 ## 기여하기
