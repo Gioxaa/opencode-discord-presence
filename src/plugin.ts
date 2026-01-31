@@ -42,7 +42,9 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
   const config = getConfig(fileOptions)
   if (!config.enabled) return {}
 
-  rpc = new DiscordRPCService(config.clientId)
+  if (!rpc || !rpc.isConnected()) {
+    rpc = new DiscordRPCService(config.clientId)
+  }
 
   const updatePresence = async (idle = false) => {
     if (!rpc) return
@@ -51,7 +53,7 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
     await rpc.setPresence(details, state)
   }
 
-  const connected = await rpc.connect()
+  const connected = rpc.isConnected() || (await rpc.connect())
   if (connected) {
     await updatePresence(false)
   }
