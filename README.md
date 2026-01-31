@@ -7,6 +7,9 @@
 
 Display your current OpenCode session status in Discord Rich Presence. Show which AI agent you're using, the current model, session time, and more.
 
+<img width="293" height="119" alt="image" src="https://github.com/user-attachments/assets/879207e0-4759-477d-ba34-f79f927737bd" />
+
+
 ## Features
 
 - **Real-time agent display** - Shows which AI agent (Claude, Prometheus, etc.) you're currently using
