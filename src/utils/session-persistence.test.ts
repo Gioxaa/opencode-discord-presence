@@ -66,4 +66,40 @@ describe("session-persistence", () => {
     const result = await loadSessionMetrics(testDir)
     expect(result).toBeNull()
   })
+
+  test("loadSessionMetrics returns null for stale session (older than 30 min)", async () => {
+    const { loadSessionMetrics } = await import("./session-persistence")
+    const stalePath = join(testDir, "session-metrics.json")
+    const staleSerialized = {
+      messageCount: 99,
+      uniqueFilesTouched: ["stale.ts"],
+      sessionStartTimestamp: Date.now() - 45 * 60 * 1000,
+      activeDurationSeconds: 2700,
+      lastActivityTimestamp: Date.now() - 45 * 60 * 1000,
+      agentSwitches: 5,
+      savedAt: Date.now() - 45 * 60 * 1000,
+    }
+    writeFileSync(stalePath, JSON.stringify(staleSerialized), "utf8")
+
+    const result = await loadSessionMetrics(testDir)
+    expect(result).toBeNull()
+  })
+
+  test("session metrics are cleared after clearSessionMetrics is called", async () => {
+    const { saveSessionMetrics, loadSessionMetrics, clearSessionMetrics } = await import(
+      "./session-persistence"
+    )
+    const metrics: SessionMetricsState = {
+      messageCount: 5,
+      uniqueFilesTouched: new Set(["x.ts"]),
+      sessionStartTimestamp: Date.now(),
+      activeDurationSeconds: 10,
+      lastActivityTimestamp: Date.now(),
+      agentSwitches: 0,
+    }
+    await saveSessionMetrics(metrics, testDir)
+    await clearSessionMetrics(testDir)
+    const result = await loadSessionMetrics(testDir)
+    expect(result).toBeNull()
+  })
 })
