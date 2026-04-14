@@ -24,6 +24,11 @@ import {
   recordTaskContext,
   type SessionMetricsState,
 } from "./utils/session-metrics.js"
+import {
+  clearSessionMetrics,
+  loadSessionMetrics,
+  saveSessionMetrics,
+} from "./utils/session-persistence.js"
 import { getToolLabel } from "./utils/tool-label.js"
 
 let rpc: DiscordRPCService | null = null
@@ -129,6 +134,11 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
   // Session metrics tracked separately due to Set serialization in SessionMetrics
   let sessionMetricsState: SessionMetricsState = createSessionMetricsState()
+  // Try to restore session metrics from previous session (e.g., after crash or restart)
+  const persisted = await loadSessionMetrics()
+  if (persisted) {
+    sessionMetricsState = persisted
+  }
 
   // Rotation state
   let rotationIndex = 0
@@ -208,6 +218,7 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
       // Track message activity
       sessionMetricsState = recordMessageActivity(sessionMetricsState)
+      await saveSessionMetrics(sessionMetricsState)
 
       // Exit idle on new chat activity
       await exitIdleIfNeeded()
@@ -227,6 +238,7 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
           updateFileAction({ file: filePath, action: toolName, operation }),
         )
         sessionMetricsState = recordFileTouch(sessionMetricsState, filePath)
+        await saveSessionMetrics(sessionMetricsState)
       } else {
         snapshot = presenceReducer(snapshot, updateFileAction({ action: toolName, operation }))
       }
@@ -247,6 +259,7 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
           updateFileAction({ file: filePath, action: toolName, operation }),
         )
         sessionMetricsState = recordFileTouch(sessionMetricsState, filePath)
+        await saveSessionMetrics(sessionMetricsState)
       } else {
         snapshot = presenceReducer(snapshot, updateFileAction({ action: toolName, operation }))
       }
@@ -274,6 +287,7 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
             }),
           )
           sessionMetricsState = recordFileTouch(sessionMetricsState, normalized)
+          await saveSessionMetrics(sessionMetricsState)
         }
         await exitIdleIfNeeded()
         await pushPresence()
@@ -318,6 +332,7 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
           if (activeTaskLabel) {
             sessionMetricsState = recordTaskContext(sessionMetricsState, activeTaskLabel)
+            await saveSessionMetrics(sessionMetricsState)
           }
         }
 
@@ -354,6 +369,7 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
         // Build recap from accumulated metrics
         const recap = createSessionRecap(sessionMetricsState)
+        await clearSessionMetrics()
         snapshot = presenceReducer(
           snapshot,
           updateRecapCache({

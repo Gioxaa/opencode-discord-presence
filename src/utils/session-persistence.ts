@@ -1,4 +1,4 @@
-import { mkdirSync, unlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, unlinkSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
@@ -6,10 +6,6 @@ import type { SessionMetricsState } from "./session-metrics"
 
 const SESSION_DIR = ".opencode-discord-presence"
 const SESSION_FILE = "session-metrics.json"
-
-function getDefaultSessionPath(): string {
-  return join(SESSION_DIR, SESSION_FILE)
-}
 
 function ensureDir(dirPath: string): void {
   mkdirSync(dirPath, { recursive: true })
@@ -94,6 +90,3 @@ export async function clearSessionMetrics(dir?: string): Promise<void> {
     // File didn't exist — that's fine
   }
 }
-
-void writeFileSync
-void getDefaultSessionPath
