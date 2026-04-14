@@ -6,6 +6,13 @@ import { getActivity } from "../utils/activity-rotation.js"
 const RECONNECT_DELAY = 5000
 const MAX_RETRIES = 10
 const DEBOUNCE_MS = 100
+const MAX_DETAILS_LENGTH = 126
+const MAX_STATE_LENGTH = 126
+
+function truncate(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str
+  return `${str.slice(0, maxLen - 1)}…`
+}
 
 export { MAX_RETRIES }
 
@@ -221,7 +228,11 @@ export class DiscordRPCService {
     rotationIndex: number,
   ): Promise<void> {
     const activity = getActivity(snapshot, opts, rotationIndex)
-    await this.setPresence(activity.details, activity.state, activity.assets)
+    await this.setPresence(
+      truncate(activity.details, MAX_DETAILS_LENGTH),
+      activity.state ? truncate(activity.state, MAX_STATE_LENGTH) : undefined,
+      activity.assets,
+    )
   }
 
   // ─── Clear ──────────────────────────────────────────────────────────────
