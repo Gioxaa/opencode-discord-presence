@@ -119,13 +119,13 @@ OPENCODE_DISCORD_LANGUAGE=ko
 
 | 상태 | 영어 | 한국어 | 설명 |
 |------|------|--------|------|
-| 활성 (편집) | `✍️ Working with {agent}` | Same | 편집 중인 파일 |
-| 활성 (읽기) | `📖 Working with {agent}` | Same | 읽고 있는 파일 |
-| 태스크 활성 | `🎯 Working with {agent}` | Same | 미션 진행 상황과 함께 |
-| Diagnostics 오류 | `🔴 Working with {agent}` | Same | 오류 감지됨 |
-| 유휴 | `😴 {agent} is idle` | Same | 활동 없음 |
-| 세션 완료 | `📊 Session Complete!` | Same | 세션 종료 (30초) |
-| 모든 태스크 완료 | `🎉 All tasks complete!` | Same | 보류 중인 태스크 없음 |
+| 활성 (편집) | `Working with {agent}` | Same | 편집 중인 파일 |
+| 활성 (읽기) | `Working with {agent}` | Same | 읽고 있는 파일 |
+| 태스크 활성 | `Working with {agent}` | Same | 미션 진행 상황과 함께 |
+| Diagnostics 오류 | `Working with {agent}` | Same | 오류 감지됨 |
+| 유휴 | `{agent} is idle` | Same | 활동 없음 |
+| 세션 완료 | `Session Complete!` | Same | 세션 종료 (30초) |
+| 모든 태스크 완료 | `All tasks complete!` | Same | 보류 중인 태스크 없음 |
 
 한국어 조사 (을/를, 은/는)는 에이전트 이름의 받침 유무에 따라 자동으로 선택됩니다.
 
@@ -135,19 +135,19 @@ OPENCODE_DISCORD_LANGUAGE=ko
 
 | 조건 | 제목 | 상태 줄 | 큰 이미지 |
 |------|------|---------|-----------|
-| 파일 편집 | `✍️ Working with Claude` | `src/plugin.ts` | 언어 아이콘 |
-| 파일 읽기 | `📖 Working with Claude` | `src/services/discord-rpc.ts` | action-reading |
-| 태스크 활성 | `🎯 Working with Claude` | `Implementing dark mode (2/5)` | task |
-| Diagnostics 오류 | `🔴 Working with Claude` | `5 errors, 2 warnings` | state-error |
-| 유휴 | `😴 Claude is idle` | `Last task: Add theme toggle` | state-idle |
-| 세션 되돌아보기 | `📊 Session Complete!` | `27 prompts • 3 files • 1h 42m` | state-recap |
-| 모든 태스크 완료 | `🎉 All tasks complete!` | `5/5 finished` | state-complete |
+| 파일 편집 | `Working with Claude` | `src/plugin.ts` | 언어 아이콘 |
+| 파일 읽기 | `Working with Claude` | `src/services/discord-rpc.ts` | action-reading |
+| 태스크 활성 | `Working with Claude` | `Implementing dark mode (2/5)` | task |
+| Diagnostics 오류 | `Working with Claude` | `5 errors, 2 warnings` | state-error |
+| 유휴 | `Claude is idle` | `Last task: Add theme toggle` | state-idle |
+| 세션 되돌아보기 | `Session Complete!` | `27 prompts • 3 files` | state-recap |
+| 모든 태스크 완료 | `All tasks complete!` | `5/5 finished` | state-complete |
 
 설명용 상태 (v1 미구현):
 
 | 조건 | 제목 | 상태 줄 | 메모 |
 |------|------|---------|------|
-| 나이트 모드 | `🌙 Burning the midnight oil` | `📄 src/index.ts • 1h 42m` | 시간 기반 설정 추가 없이는 v1 미지원 |
+| 나이트 모드 | `Burning the midnight oil` | `src/index.ts` | 시간 기반 설정 추가 없이는 v1 미지원 |
 
 ## 개발
 

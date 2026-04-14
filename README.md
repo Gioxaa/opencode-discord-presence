@@ -124,13 +124,13 @@ The plugin hooks into OpenCode's event system:
 
 | State | English | Korean | Description |
 |-------|---------|--------|-------------|
-| Active editing | `✍️ Working with {agent}` | Same | File being edited |
-| Active reading | `📖 Working with {agent}` | Same | File being read |
-| Task active | `🎯 Working with {agent}` | Same | With mission progress |
-| Diagnostics error | `🔴 Working with {agent}` | Same | Errors detected |
-| Idle | `😴 {agent} is idle` | Same | No activity |
-| Session complete | `📊 Session Complete!` | Same | Session ended (30s) |
-| All tasks done | `🎉 All tasks complete!` | Same | No pending tasks |
+| Active editing | `Working with {agent}` | Same | File being edited |
+| Active reading | `Working with {agent}` | Same | File being read |
+| Task active | `Working with {agent}` | Same | With mission progress |
+| Diagnostics error | `Working with {agent}` | Same | Errors detected |
+| Idle | `{agent} is idle` | Same | No activity |
+| Session complete | `Session Complete!` | Same | Session ended (30s) |
+| All tasks done | `All tasks complete!` | Same | No pending tasks |
 
 Korean particles (을/를, 은/는) are automatically selected based on whether the agent name ends with a consonant (받침).
 
@@ -140,19 +140,19 @@ The following states are fully supported in v1 (runtime-backed):
 
 | Condition | Headline | State line | Large image |
 |-----------|----------|------------|-------------|
-| Editing file | `✍️ Working with Claude` | `src/plugin.ts` | language icon |
-| Reading file | `📖 Working with Claude` | `src/services/discord-rpc.ts` | action-reading |
-| Task active | `🎯 Working with Claude` | `Implementing dark mode (2/5)` | task |
-| Diagnostics error | `🔴 Working with Claude` | `5 errors, 2 warnings` | state-error |
-| Idle | `😴 Claude is idle` | `Last task: Add theme toggle` | state-idle |
-| Session recap | `📊 Session Complete!` | `27 prompts • 3 files • 1h 42m` | state-recap |
-| All tasks complete | `🎉 All tasks complete!` | `5/5 finished` | state-complete |
+| Editing file | `Working with Claude` | `src/plugin.ts` | language icon |
+| Reading file | `Working with Claude` | `src/services/discord-rpc.ts` | action-reading |
+| Task active | `Working with Claude` | `Implementing dark mode (2/5)` | task |
+| Diagnostics error | `Working with Claude` | `5 errors, 2 warnings` | state-error |
+| Idle | `Claude is idle` | `Last task: Add theme toggle` | state-idle |
+| Session recap | `Session Complete!` | `27 prompts • 3 files` | state-recap |
+| All tasks complete | `All tasks complete!` | `5/5 finished` | state-complete |
 
 Illustrative-only states (not implemented in v1):
 
 | Condition | Headline | State line | Notes |
 |-----------|----------|------------|-------|
-| Night mode | `🌙 Burning the midnight oil` | `📄 src/index.ts • 1h 42m` | Not in v1 unless time-based config added |
+| Night mode | `Burning the midnight oil` | `src/index.ts` | Not in v1 unless time-based config added |
 
 ## Development
 
