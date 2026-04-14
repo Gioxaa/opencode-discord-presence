@@ -42,20 +42,10 @@ function getOperationEmoji(operation: string): string {
   return OPERATION_EMOJI[operation] ?? "📝"
 }
 
-function formatDuration(seconds: number): string {
-  const s = Math.floor(seconds)
-  if (s < 60) return `${s}s`
-  const m = Math.floor(s / 60)
-  const h = Math.floor(m / 60)
-  if (h > 0) return `${h}h ${m % 60}m`
-  return `${m}m`
-}
-
 function formatStatsLine(metrics: PresenceSnapshot["sessionMetrics"]): string {
   const prompts = metrics.messageCount
   const files = metrics.uniqueFilesTouched?.size ?? 0
-  const duration = formatDuration(metrics.activeDurationSeconds)
-  return `${prompts} prompts • ${files} files • ${duration}`
+  return `${prompts} prompts • ${files} files`
 }
 
 function formatTaskLine(todo: PresenceSnapshot["todoSummary"]): string {
