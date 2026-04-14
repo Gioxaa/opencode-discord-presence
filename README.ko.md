@@ -12,6 +12,11 @@ OpenCode 세션 상태를 Discord Rich Presence로 표시합니다. 현재 사�
 - **세션 시간 추적** - 코딩 시간 표시
 - **한국어 지원** - 한국어 조사 자동 처리 (을/를, 은/는)
 - **유휴 감지** - 휴식 중일 때 자동으로 상태 변경
+- **라이브 파일 스포트라이트** - 에이전트가 편집, 읽기, 진단 중인 파일을 언어별 Discord 아이콘과 함께 표시
+- **태스크 미션 보드** - 활성 태스크 레이블과 완료 카운트 (예: "다크 모드 구현 중 (2/5)")로 진행 상황 표시
+- ** Diagnostics 인식 presence** - LSP diagnostics가 있을 때 자동으로 오류/경고 카운트 표시 (see [제한사항](#제한사항))
+- **스마트 로테이션** - 심각한 상태 (오류, 유휴, 모두 완료)는 고정; 정보성 카드 (파일 스포트라이트, 미션 보드, 세션 통계)는 기본 20초마다 순환
+- **세션 되돌아보기** - 세션이 종료되면 30초 동안 총 프롬프트 수, 수정된 파일 수, 활성 기간을 표시
 
 ## 설치
 
@@ -65,6 +70,10 @@ OPENCODE_DISCORD_LANGUAGE=ko
 | `enabled` | `boolean` | `true` | 플러그인 활성화/비활성화 |
 | `applicationId` | `string` | (내장) | 커스텀 브랜딩을 위한 Discord Application ID |
 | `language` | `string` | `"en"` | 표시 언어 (`"en"` 또는 `"ko"`) |
+| `richPresence.enableFileSpotlight` | `boolean` | `true` | 라이브 파일 스포트라이트 카드 표시 |
+| `richPresence.enableMissionBoard` | `boolean` | `true` | 태스크 미션 보드 카드 표시 |
+| `richPresence.rotationIntervalSeconds` | `number` | `20` | 정보성 카드 순환 주기 (10–60초) |
+| `richPresence.diagnostics.errorsOnly` | `boolean` | `true` | 오류 diagnostics 고정; 경고는 순환에 표시 |
 
 ### 설정 파일 우선순위
 
@@ -96,16 +105,49 @@ OPENCODE_DISCORD_LANGUAGE=ko
 플러그인은 OpenCode의 이벤트 시스템에 연결됩니다:
 
 - **chat.message** - 메시지 송수신 시 현재 에이전트와 모델을 추적하여 presence 업데이트
-- **event** - 세션 상태 변경 (유휴, 활성) 감지
+- **tool.execute.before** / **tool.execute.after** - 파일 컨텍스트 및 도구 작업 레이블 캡처 (편집, 읽기, 검색, 빌드, 테스트 등)
+- **file.edited** - 편집된 파일 경로와 언어 아이콘으로 라이브 파일 스포트라이트 업데이트
+- **todo.updated** - 활성 태스크 레이블과 완료 카운트로 미션 보드 진행 상황 업데이트
+- **session.idle** - 상태 줄에 마지막 활성 태스크와 함께 유휴 상태 표시
+- **session.deleted** - 세션 종료 후 30초 동안 총 프롬프트 수, 수정된 파일 수, 활성 기간 표시
+
+### 제한사항
+
+- **lsp.client.diagnostics**는 등록되어 있지만, OpenCode 플러그인 API v1에서는 오류/경고 카운트를 사용할 수 없습니다. Presence에 표시되는 진단 카운트는 외부 LSP 구성이 필요합니다. 플러그인은 diagnostics 이벤트를 로그하지만 카운트를 임의로 생성하지 않습니다.
 
 ### Presence 상태
 
 | 상태 | 영어 | 한국어 | 설명 |
 |------|------|--------|------|
-| 활성 | "Working with Prometheus" | "Prometheus를 갈구는중" | 에이전트로 활발히 코딩 중 |
-| 유휴 | "Prometheus is idle" | "Prometheus는 휴식중" | 세션이 유휴 상태 |
+| 활성 (편집) | `✍️ Working with {agent}` | Same | 편집 중인 파일 |
+| 활성 (읽기) | `📖 Working with {agent}` | Same | 읽고 있는 파일 |
+| 태스크 활성 | `🎯 Working with {agent}` | Same | 미션 진행 상황과 함께 |
+| Diagnostics 오류 | `🔴 Working with {agent}` | Same | 오류 감지됨 |
+| 유휴 | `😴 {agent} is idle` | Same | 활동 없음 |
+| 세션 완료 | `📊 Session Complete!` | Same | 세션 종료 (30초) |
+| 모든 태스크 완료 | `🎉 All tasks complete!` | Same | 보류 중인 태스크 없음 |
 
 한국어 조사 (을/를, 은/는)는 에이전트 이름의 받침 유무에 따라 자동으로 선택됩니다.
+
+## 시각적 샘플 매트릭스
+
+다음 상태들은 v1에서 완전 지원됩니다 (런타임 기반):
+
+| 조건 | 제목 | 상태 줄 | 큰 이미지 |
+|------|------|---------|-----------|
+| 파일 편집 | `✍️ Working with Claude` | `src/plugin.ts` | 언어 아이콘 |
+| 파일 읽기 | `📖 Working with Claude` | `src/services/discord-rpc.ts` | action-reading |
+| 태스크 활성 | `🎯 Working with Claude` | `Implementing dark mode (2/5)` | task |
+| Diagnostics 오류 | `🔴 Working with Claude` | `5 errors, 2 warnings` | state-error |
+| 유휴 | `😴 Claude is idle` | `Last task: Add theme toggle` | state-idle |
+| 세션 되돌아보기 | `📊 Session Complete!` | `27 prompts • 3 files • 1h 42m` | state-recap |
+| 모든 태스크 완료 | `🎉 All tasks complete!` | `5/5 finished` | state-complete |
+
+설명용 상태 (v1 미구현):
+
+| 조건 | 제목 | 상태 줄 | 메모 |
+|------|------|---------|------|
+| 나이트 모드 | `🌙 Burning the midnight oil` | `📄 src/index.ts • 1h 42m` | 시간 기반 설정 추가 없이는 v1 미지원 |
 
 ## 개발
 
@@ -137,14 +179,21 @@ bun run build
 ```
 src/
 ├── index.ts              # 메인 진입점 & exports
-├── plugin.ts             # 핵심 플러그인 구현
+├── plugin.ts             # OpenCode hook 등록 + presence 엔진
 ├── config.ts             # 설정 관리
 ├── types/
 │   └── index.ts          # TypeScript 타입 정의
 ├── services/
-│   └── discord-rpc.ts    # Discord RPC 서비스 (싱글톤)
+│   └── discord-rpc.ts    # Discord RPC 서비스 (수명주기 강화됨)
+├── state/
+│   └── presence-state.ts # 인스턴스 범위 presence 스냅샷 + 리듀서
 └── utils/
-    └── particle.ts       # 한국어 조사 처리 (을/를, 은/는)
+    ├── activity-rotation.ts # 우선순위 + 로테이션 엔진
+    ├── file-label.ts        # 경로 정제 + 잘라냄
+    ├── file-icons.ts        # 언어 → 아이콘 매핑
+    ├── session-metrics.ts   # 세션 카운터 + 되돌아보기
+    ├── tool-label.ts        # 도구 → 작업 레이블 매핑
+    └── particle.ts          # 한국어 조사 처리 (을/를, 은/는)
 ```
 
 ## 기여하기

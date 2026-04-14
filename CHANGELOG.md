@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Enhanced Rich Presence** — major feature update with Live File Spotlight, Task Mission Board, diagnostics-aware states, session recap, and smart rotation
+  - Live File Spotlight shows the file currently being edited/read/diagnosed with language-specific Discord icons
+  - Task Mission Board displays active todo progress with completion counts (e.g., "Implementing dark mode (2/5)")
+  - Diagnostics-aware presence pins error counts when LSP errors are detected
+  - Session recap shows total prompts, files touched, and active duration for 30 seconds after session end
+  - Informational cards rotate every 20 seconds by default (configurable 10–60s)
+  - Critical states (errors, idle, all-done, recap) pin until resolved
+- Added new configuration options: `richPresence.enableFileSpotlight`, `richPresence.enableMissionBoard`, `richPresence.rotationIntervalSeconds`, `richPresence.diagnostics.errorsOnly`
+- Refactored plugin to use instance-scoped presence state (no more module-level mutable globals)
+- Hardened Discord RPC service with explicit disconnect, throttled updates, and stale-replay prevention
+
+### Fixed
+
+- Empty catch blocks in RPC service — replaced with structured error logging
+- Potential stale replay after session deletion — guarded by `cleared` flag
+- Infinite reconnect loop — `disconnect()` now prevents further reconnect attempts
+
 ## [0.1.0] - 2026-01-30
 
 ### Added

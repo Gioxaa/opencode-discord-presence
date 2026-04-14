@@ -1,11 +1,66 @@
-import type { DiscordPresenceOptions, Language, PresenceConfig } from "./types/index.js"
+import type {
+  DiscordPresenceOptions,
+  Language,
+  PresenceConfig,
+  RichPresenceOptions,
+} from "./types/index.js"
 
 export const DEFAULT_CLIENT_ID = "1466770544748662819"
+
+/** Default rotation interval in seconds. Must be within 10-60 range. */
+export const DEFAULT_ROTATION_INTERVAL_SECONDS = 20
+
+/** Minimum allowed rotation interval in seconds. */
+export const MIN_ROTATION_INTERVAL_SECONDS = 10
+
+/** Maximum allowed rotation interval in seconds. */
+export const MAX_ROTATION_INTERVAL_SECONDS = 60
 
 function parseLanguage(lang?: string): Language {
   const normalized = lang?.toLowerCase()
   if (normalized === "ko" || normalized === "kr" || normalized === "korean") return "ko"
   return "en"
+}
+
+/**
+ * Clamps and parses rotation interval safely.
+ * Invalid values fall back to DEFAULT_ROTATION_INTERVAL_SECONDS.
+ */
+function parseRotationInterval(raw?: number): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return DEFAULT_ROTATION_INTERVAL_SECONDS
+  }
+  const rounded = Math.round(raw)
+  if (rounded < MIN_ROTATION_INTERVAL_SECONDS) {
+    return MIN_ROTATION_INTERVAL_SECONDS
+  }
+  if (rounded > MAX_ROTATION_INTERVAL_SECONDS) {
+    return MAX_ROTATION_INTERVAL_SECONDS
+  }
+  return rounded
+}
+
+/**
+ * Parses rich presence options with safe defaults.
+ * Omitted keys receive safe defaults so partial configs are always safe.
+ */
+function parseRichPresenceOptions(raw?: Partial<RichPresenceOptions>): RichPresenceOptions {
+  if (raw == null) {
+    return {
+      enableFileSpotlight: true,
+      enableMissionBoard: true,
+      rotationIntervalSeconds: DEFAULT_ROTATION_INTERVAL_SECONDS,
+      diagnostics: { errorsOnly: true },
+    }
+  }
+  return {
+    enableFileSpotlight: raw.enableFileSpotlight ?? true,
+    enableMissionBoard: raw.enableMissionBoard ?? true,
+    rotationIntervalSeconds: parseRotationInterval(raw.rotationIntervalSeconds),
+    diagnostics: {
+      errorsOnly: raw.diagnostics?.errorsOnly ?? true,
+    },
+  }
 }
 
 export function getConfig(options?: DiscordPresenceOptions): PresenceConfig {
@@ -17,5 +72,6 @@ export function getConfig(options?: DiscordPresenceOptions): PresenceConfig {
     enabled: options?.enabled ?? envEnabled !== "false",
     clientId: options?.applicationId ?? envClientId ?? DEFAULT_CLIENT_ID,
     language: parseLanguage(options?.language ?? envLanguage),
+    richPresence: parseRichPresenceOptions(options?.richPresence),
   }
 }
