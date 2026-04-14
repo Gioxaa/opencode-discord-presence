@@ -75,6 +75,26 @@ describe("getActivity — precedence", () => {
     expect(activity.details).toContain("Claude is idle")
   })
 
+  test("idle does not fall back to session duration context", () => {
+    const state = makeState({
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+      idle: true,
+      fileAction: {},
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+      sessionMetrics: {
+        ...makeState().sessionMetrics,
+        sessionStartTimestamp: Date.now() - 60_000,
+        activeDurationSeconds: 60,
+      },
+    })
+
+    const activity = getActivity(state, defaultOpts())
+
+    expect(activity.details).toBe("Claude is idle")
+    expect(activity.state).toBeUndefined()
+  })
+
   test("all-done pins over file/task rotation", () => {
     const state = makeState({
       recapCache: {},
@@ -200,7 +220,7 @@ describe("getActivity — rotation (no critical state)", () => {
     const act2 = getActivity(state, opts, 2)
     expect(act2.details).toContain("Working with Claude")
     expect(act2.state).toMatch(/3 warnings/)
-    expect(act2.details).toContain("⚠️")
+    expect(act2.details).toContain("Working with Claude")
 
     // index 3 → stats
     const act3 = getActivity(state, opts, 3)
@@ -228,7 +248,7 @@ describe("getActivity — rotation (no critical state)", () => {
     // diagnostics-error takes precedence since errors > 0
     const act2 = getActivity(state, opts, 2)
     expect(act2.state).toMatch(/\d+ errors?/)
-    expect(act2.details).toContain("🔴")
+    expect(act2.details).toContain("Working with Claude")
   })
 
   test("file spotlight disabled → skips to task or stats (or warnings)", () => {
@@ -333,10 +353,10 @@ describe("getActivity — rotation (no critical state)", () => {
   })
 })
 
-describe("getActivity — operation-specific file spotlight emoji", () => {
+describe("getActivity — operation-specific file spotlight details", () => {
   const baseOpts = defaultOpts()
 
-  test("editing uses ✍️ emoji", () => {
+  test("editing uses plain working details", () => {
     const state = makeState({
       idle: false,
       fileAction: {
@@ -350,10 +370,10 @@ describe("getActivity — operation-specific file spotlight emoji", () => {
     })
 
     const activity = getActivity(state, baseOpts, 0)
-    expect(activity.details).toBe("✍️ Working with Claude")
+    expect(activity.details).toBe("Working with Claude")
   })
 
-  test("reading uses 📖 emoji", () => {
+  test("reading uses plain working details", () => {
     const state = makeState({
       idle: false,
       fileAction: {
@@ -367,10 +387,10 @@ describe("getActivity — operation-specific file spotlight emoji", () => {
     })
 
     const activity = getActivity(state, baseOpts, 0)
-    expect(activity.details).toBe("📖 Working with Claude")
+    expect(activity.details).toBe("Working with Claude")
   })
 
-  test("searching uses 🔍 emoji", () => {
+  test("searching uses plain working details", () => {
     const state = makeState({
       idle: false,
       fileAction: {
@@ -384,10 +404,10 @@ describe("getActivity — operation-specific file spotlight emoji", () => {
     })
 
     const activity = getActivity(state, baseOpts, 0)
-    expect(activity.details).toBe("🔍 Working with Claude")
+    expect(activity.details).toBe("Working with Claude")
   })
 
-  test("running tests uses 🧪 emoji", () => {
+  test("running tests uses plain working details", () => {
     const state = makeState({
       idle: false,
       fileAction: {
@@ -401,10 +421,10 @@ describe("getActivity — operation-specific file spotlight emoji", () => {
     })
 
     const activity = getActivity(state, baseOpts, 0)
-    expect(activity.details).toBe("🧪 Working with Claude")
+    expect(activity.details).toBe("Working with Claude")
   })
 
-  test("building uses 🔨 emoji", () => {
+  test("building uses plain working details", () => {
     const state = makeState({
       idle: false,
       fileAction: {
@@ -418,10 +438,10 @@ describe("getActivity — operation-specific file spotlight emoji", () => {
     })
 
     const activity = getActivity(state, baseOpts, 0)
-    expect(activity.details).toBe("🔨 Working with Claude")
+    expect(activity.details).toBe("Working with Claude")
   })
 
-  test("diagnosing uses 🩺 emoji", () => {
+  test("diagnosing uses plain working details", () => {
     const state = makeState({
       idle: false,
       fileAction: {
@@ -435,7 +455,7 @@ describe("getActivity — operation-specific file spotlight emoji", () => {
     })
 
     const activity = getActivity(state, baseOpts, 0)
-    expect(activity.details).toBe("🩺 Working with Claude")
+    expect(activity.details).toBe("Working with Claude")
   })
 
   test("operation falls back to getToolLabel when operation is not explicitly set", () => {
@@ -452,8 +472,8 @@ describe("getActivity — operation-specific file spotlight emoji", () => {
     })
 
     const activity = getActivity(state, baseOpts, 0)
-    // getToolLabel({ eventName: "tool.execute.read" }) → "Reading" → 📖
-    expect(activity.details).toBe("📖 Working with Claude")
+    // getToolLabel({ eventName: "tool.execute.read" }) → "Reading"
+    expect(activity.details).toBe("Working with Claude")
   })
 })
 
@@ -498,7 +518,7 @@ describe("getActivity — file-icons integration", () => {
 })
 
 describe("getActivity — headline preservation", () => {
-  test("idle headline uses '😴 Claude is idle' style", () => {
+  test("idle headline uses plain idle style", () => {
     const state = makeState({
       idle: true,
       recapCache: {},
@@ -507,7 +527,7 @@ describe("getActivity — headline preservation", () => {
 
     const activity = getActivity(state, defaultOpts())
 
-    expect(activity.details).toBe("😴 Claude is idle")
+    expect(activity.details).toBe("Claude is idle")
   })
 
   test("session recap uses dedicated 'Session Complete!' headline", () => {

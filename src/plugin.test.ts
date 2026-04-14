@@ -419,12 +419,12 @@ describe("getActivity integration with snapshot", () => {
 
     const activity = getActivity(snapshot, defaultOpts, 0)
 
-    expect(activity.details).toBe("😴 Claude is idle")
+    expect(activity.details).toBe("Claude is idle")
     expect(activity.state).toContain("Last task:")
     expect(activity.state).toContain("Implement feature X")
   })
 
-  test("active operation + file spotlight uses operation emoji", () => {
+  test("active operation + file spotlight uses plain working details", () => {
     let snapshot = createInitialPresenceState()
     snapshot = presenceReducer(snapshot, updateIdentity({ agent: "Claude" }))
     // Use workspace-relative path (no leading ./) since formatFileLabel returns basename
@@ -439,8 +439,7 @@ describe("getActivity integration with snapshot", () => {
 
     const activity = getActivity(snapshot, defaultOpts, 0)
 
-    expect(activity.details).toContain("✍️")
-    expect(activity.details).toContain("Claude")
+    expect(activity.details).toBe("Working with Claude")
     // formatFileLabel with no workspace root returns basename: "plugin.ts"
     expect(activity.state).toContain("plugin.ts")
   })
@@ -504,7 +503,7 @@ describe("getActivity integration with snapshot", () => {
 
     const activity = getActivity(snapshot, defaultOpts, 0)
 
-    expect(activity.details).toContain("🔴")
+    expect(activity.details).toBe("Working with Claude")
     expect(activity.state).toContain("5 errors")
   })
 })

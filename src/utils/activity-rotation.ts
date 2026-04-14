@@ -163,7 +163,7 @@ export function getActivity(
   // ── 2. Diagnostics-error ────────────────────────────────────────────────
   if (opts.diagnostics.errorsOnly && errors > 0) {
     return {
-      details: `🔴 Working with ${agent}`,
+      details: `Working with ${agent}`,
       state: `${errors} error${errors !== 1 ? "s" : ""}, ${warnings} warning${warnings !== 1 ? "s" : ""}`,
       assets: {
         largeImageKey: "state-error",
@@ -178,12 +178,10 @@ export function getActivity(
       ? `Last task: ${truncateTaskLabel(todoSummary.activeTaskLabel, MAX_STATE_LENGTH)}`
       : fileAction.file
         ? `Last file: ${formatFileLabel(fileAction.file)}`
-        : sessionMetrics.sessionStartTimestamp
-          ? `Session: ${formatDuration(sessionMetrics.activeDurationSeconds)}`
-          : undefined
+        : undefined
 
     return {
-      details: `😴 ${agent} is idle`,
+      details: `${agent} is idle`,
       state: idleContext,
       assets: {
         largeImageKey: "state-idle",
@@ -215,11 +213,11 @@ export function getActivity(
       toolName: fileAction.action,
     }
     const operation = fileAction.operation ?? getToolLabel(toolInput)
-    const emoji = getOperationEmoji(operation)
+    void getOperationEmoji(operation)
     const fileLabel = formatFileLabel(fileAction.file)
 
     return {
-      details: `${emoji} Working with ${agent}`,
+      details: `Working with ${agent}`,
       state: fileLabel,
       assets: {
         // Use the existing file-icons utility for language-based icons
@@ -232,7 +230,7 @@ export function getActivity(
   // ── 6. Task mission board ────────────────────────────────────────────────
   if (rotatingCard === "task-mission-board" && todoSummary.total > 0) {
     return {
-      details: `🎯 Working with ${agent}`,
+      details: `Working with ${agent}`,
       state: formatTaskLine(todoSummary),
       assets: {
         largeImageKey: "task",
@@ -245,7 +243,7 @@ export function getActivity(
   // Only shown when warnings > 0 and errors = 0 (otherwise step 2 pins)
   if (rotatingCard === "diagnostics-warnings" && warnings > 0 && errors === 0) {
     return {
-      details: `⚠️ Working with ${agent}`,
+      details: `Working with ${agent}`,
       state: `${warnings} warning${warnings !== 1 ? "s" : ""}`,
       assets: {
         largeImageKey: "state-warn",
@@ -256,7 +254,7 @@ export function getActivity(
 
   // ── 8. Session stats (always available fallback) ─────────────────────────
   return {
-    details: `📊 Working with ${agent}`,
+    details: `Working with ${agent}`,
     state: formatStatsLine(sessionMetrics),
     assets: {
       largeImageKey: "stats",
