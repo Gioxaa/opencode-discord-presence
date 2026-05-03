@@ -26,6 +26,21 @@ describe("getConfig", () => {
     expect(config.clientId).toBe("1234567890")
   })
 
+  test("parses nested discordPresence.applicationId option from options object", () => {
+    const config = getConfig({
+      discordPresence: { applicationId: "0987654321" },
+    } as Parameters<typeof getConfig>[0])
+    expect(config.clientId).toBe("0987654321")
+  })
+
+  test("prefers top-level applicationId over nested discordPresence.applicationId", () => {
+    const config = getConfig({
+      applicationId: "top-level-id",
+      discordPresence: { applicationId: "nested-id" },
+    } as Parameters<typeof getConfig>[0])
+    expect(config.clientId).toBe("top-level-id")
+  })
+
   test("parses legacy language option from options object (en)", () => {
     const config = getConfig({ language: "en" })
     expect(config.language).toBe("en")
@@ -109,10 +124,9 @@ describe("getConfig", () => {
   })
 
   test("ignores non-numeric rotation interval and falls back to default", () => {
-    // @ts-expect-error - intentional invalid input at runtime
     const config = getConfig({
       richPresence: { rotationIntervalSeconds: "twenty" },
-    })
+    } as unknown as Parameters<typeof getConfig>[0])
     expect(config.richPresence.rotationIntervalSeconds).toBe(20)
   })
 

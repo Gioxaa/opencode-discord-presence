@@ -5,6 +5,12 @@ import type {
   RichPresenceOptions,
 } from "./types/index.js"
 
+type CompatibleDiscordPresenceOptions = DiscordPresenceOptions & {
+  discordPresence?: {
+    applicationId?: string
+  }
+}
+
 export const DEFAULT_CLIENT_ID = "1466770544748662819"
 
 /** Default rotation interval in seconds. Must be within 10-60 range. */
@@ -64,13 +70,18 @@ function parseRichPresenceOptions(raw?: Partial<RichPresenceOptions>): RichPrese
 }
 
 export function getConfig(options?: DiscordPresenceOptions): PresenceConfig {
+  const compatibleOptions = options as CompatibleDiscordPresenceOptions | undefined
   const envEnabled = process.env.OPENCODE_DISCORD_ENABLED
   const envClientId = process.env.OPENCODE_DISCORD_CLIENT_ID
   const envLanguage = process.env.OPENCODE_DISCORD_LANGUAGE
 
   return {
     enabled: options?.enabled ?? envEnabled !== "false",
-    clientId: options?.applicationId ?? envClientId ?? DEFAULT_CLIENT_ID,
+    clientId:
+      compatibleOptions?.applicationId ??
+      compatibleOptions?.discordPresence?.applicationId ??
+      envClientId ??
+      DEFAULT_CLIENT_ID,
     language: parseLanguage(options?.language ?? envLanguage),
     richPresence: parseRichPresenceOptions(options?.richPresence),
   }

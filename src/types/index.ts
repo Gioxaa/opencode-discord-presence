@@ -32,6 +32,9 @@ export interface PresenceConfig {
 export interface DiscordPresenceOptions {
   enabled?: boolean
   applicationId?: string
+  discordPresence?: {
+    applicationId?: string
+  }
   language?: string
   richPresence?: Partial<RichPresenceOptions>
 }
