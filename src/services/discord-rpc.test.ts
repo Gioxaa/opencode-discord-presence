@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { DiscordRPCService, MAX_RETRIES } from "./discord-rpc"
+import { createRecapCleanupTask, DiscordRPCService, MAX_RETRIES } from "./discord-rpc"
 
 // ─── Mock Client ───────────────────────────────────────────────────────────────
 
@@ -13,16 +13,19 @@ type MockUser = {
 type MockClient = {
   on: (event: string, handler: () => void) => void
   login: () => Promise<void>
+  destroy: () => Promise<void>
   user: MockUser
   _handlers: Record<string, () => void>
+  destroyCalls: number
 }
 
-function createMockClient(): MockClient {
+function createMockClient(events: string[] = []): MockClient {
   const user: MockUser = {
     setActivity: async (activity: unknown) => {
       user.setActivityCalls.push({ args: [activity] })
     },
     clearActivity: async () => {
+      events.push("clear")
       user.clearActivityCalls++
     },
     setActivityCalls: [],
@@ -35,8 +38,13 @@ function createMockClient(): MockClient {
       handlers[event] = handler
     },
     login: async () => {},
+    destroy: async () => {
+      events.push("destroy")
+      client.destroyCalls++
+    },
     user,
     _handlers: handlers,
+    destroyCalls: 0,
   }
 
   return client
@@ -70,46 +78,109 @@ describe("DiscordRPCService", () => {
   })
 
   describe("disconnect()", () => {
-    test("disconnect() sets disconnecting flag", () => {
+    test("disconnect() sets disconnecting flag", async () => {
       const rpc = new DiscordRPCService("123")
       rpc._setConnected(true)
-      rpc.disconnect()
+      await rpc.disconnect()
       const state = rpc._getState()
       expect(state.disconnecting).toBe(true)
       expect(state.connected).toBe(false)
     })
 
-    test("disconnect() clears currentPresence", () => {
+    test("disconnect() clears currentPresence", async () => {
       const rpc = new DiscordRPCService("123")
       rpc._setConnected(true)
-      rpc.disconnect()
+      await rpc.disconnect()
       const state = rpc._getState()
       expect(state.hasCurrentPresence).toBe(false)
     })
 
-    test("disconnect() clears debounce timer", () => {
+    test("disconnect() clears debounce timer", async () => {
       const rpc = new DiscordRPCService("123")
       rpc._setConnected(true)
-      rpc.disconnect()
+      await rpc.disconnect()
       const state = rpc._getState()
       expect(state.hasDebounceTimer).toBe(false)
     })
 
-    test("disconnect() is idempotent — calling multiple times does not throw", () => {
+    test("disconnect() is idempotent — calling multiple times does not throw", async () => {
+      const mockClient = createMockClient()
       const rpc = new DiscordRPCService("123")
+      // @ts-expect-error — test injection
+      rpc._overrideClient(mockClient)
       rpc._setConnected(true)
-      rpc.disconnect()
-      rpc.disconnect()
-      rpc.disconnect()
+      await rpc.disconnect()
+      await rpc.disconnect()
+      await rpc.disconnect()
       // If we get here without throwing, the test passes
       expect(rpc._getState().disconnecting).toBe(true)
+      expect(mockClient.destroyCalls).toBe(1)
     })
 
-    test("disconnect() after connect: isConnected returns false", () => {
+    test("disconnect() after connect: isConnected returns false", async () => {
       const rpc = new DiscordRPCService("123")
       rpc._setConnected(true)
-      rpc.disconnect()
+      await rpc.disconnect()
       expect(rpc.isConnected()).toBe(false)
+    })
+
+    test("disconnect() calls client.destroy exactly once for a live client", async () => {
+      const mockClient = createMockClient()
+      const rpc = new DiscordRPCService("123")
+      // @ts-expect-error — test injection
+      rpc._overrideClient(mockClient)
+      rpc._setConnected(true)
+
+      await rpc.disconnect()
+
+      expect(mockClient.destroyCalls).toBe(1)
+    })
+  })
+
+  describe("recap cleanup task", () => {
+    test("cleanup task clears presence before destroy", async () => {
+      const events: string[] = []
+      const mockClient = createMockClient(events)
+      const rpc = new DiscordRPCService("123")
+      // @ts-expect-error — test injection
+      rpc._overrideClient(mockClient)
+      rpc._setConnected(true)
+
+      let recapCleared = 0
+      const cleanup = createRecapCleanupTask(rpc, () => {
+        recapCleared++
+        events.push("recap")
+      })
+
+      await cleanup()
+
+      expect(recapCleared).toBe(1)
+      expect(events).toEqual(["recap", "clear", "destroy"])
+    })
+
+    test("cleanup task captures the original rpc instance and cannot clear a newer one", async () => {
+      const firstClient = createMockClient()
+      const secondClient = createMockClient()
+      const sessionA = new DiscordRPCService("123")
+      const sessionB = new DiscordRPCService("456")
+      // @ts-expect-error — test injection
+      sessionA._overrideClient(firstClient)
+      // @ts-expect-error — test injection
+      sessionB._overrideClient(secondClient)
+      sessionA._setConnected(true)
+      sessionB._setConnected(true)
+
+      const cleanup = createRecapCleanupTask(sessionA, () => {})
+      let activeRpc: DiscordRPCService | null = sessionA
+      activeRpc = sessionB
+
+      await cleanup()
+
+      expect(activeRpc).toBe(sessionB)
+      expect(firstClient.user.clearActivityCalls).toBe(1)
+      expect(firstClient.destroyCalls).toBe(1)
+      expect(secondClient.user.clearActivityCalls).toBe(0)
+      expect(secondClient.destroyCalls).toBe(0)
     })
   })
 
@@ -191,7 +262,10 @@ describe("DiscordRPCService", () => {
       // @ts-expect-error — test injection
       rpc._overrideClient(mockClient)
       rpc._setConnected(true)
-      rpc._setTimerImpl(setTimeoutImpl, clearTimeoutImpl)
+      rpc._setTimerImpl(
+        setTimeoutImpl as unknown as typeof setTimeout,
+        clearTimeoutImpl as unknown as typeof clearTimeout,
+      )
 
       rpc.setPresence("Activity 1", "state1")
       rpc.setPresence("Activity 2", "state2")
@@ -261,16 +335,16 @@ describe("DiscordRPCService", () => {
       expect(rpc.isConnected()).toBe(false)
     })
 
-    test("returns false after disconnect()", () => {
+    test("returns false after disconnect()", async () => {
       const rpc = new DiscordRPCService("123")
       rpc._setConnected(true)
-      rpc.disconnect()
+      await rpc.disconnect()
       expect(rpc.isConnected()).toBe(false)
     })
   })
 
   describe("disconnect() + reconnect prevention", () => {
-    test("disconnecting flag prevents scheduleReconnect from setting a timer", () => {
+    test("disconnecting flag prevents scheduleReconnect from setting a timer", async () => {
       const timers: number[] = []
       let timerId = 0
       const setTimeoutImpl = (_fn: () => void, _delay: number) => {
@@ -281,8 +355,11 @@ describe("DiscordRPCService", () => {
       const clearTimeoutImpl = (_id: number) => {}
 
       const rpc = new DiscordRPCService("123")
-      rpc._setTimerImpl(setTimeoutImpl, clearTimeoutImpl)
-      rpc.disconnect() // sets disconnecting = true
+      rpc._setTimerImpl(
+        setTimeoutImpl as unknown as typeof setTimeout,
+        clearTimeoutImpl as unknown as typeof clearTimeout,
+      )
+      await rpc.disconnect() // sets disconnecting = true
 
       // scheduleReconnect should return early because disconnecting = true
       // Therefore no timer should be scheduled

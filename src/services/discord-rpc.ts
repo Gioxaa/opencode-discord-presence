@@ -1,6 +1,6 @@
 import { Client } from "@xhayper/discord-rpc"
 import type { PresenceSnapshot } from "../state/presence-state.js"
-import type { RichPresenceOptions, SetActivity } from "../types/index.js"
+import type { Language, RichPresenceOptions, SetActivity } from "../types/index.js"
 import { getActivity } from "../utils/activity-rotation.js"
 
 const RECONNECT_DELAY = 5000
@@ -8,6 +8,18 @@ const MAX_RETRIES = 10
 const DEBOUNCE_MS = 100
 const MAX_DETAILS_LENGTH = 126
 const MAX_STATE_LENGTH = 126
+
+export function createRecapCleanupTask(
+  rpc: DiscordRPCService | null,
+  clearRecapState: () => void,
+): () => Promise<void> {
+  return async () => {
+    clearRecapState()
+    if (!rpc) return
+    await rpc.clear()
+    await rpc.disconnect()
+  }
+}
 
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str
@@ -146,7 +158,11 @@ export class DiscordRPCService {
    * Explicitly disconnects and prevents any further reconnect attempts.
    * Clears all connection state and pending updates.
    */
-  disconnect() {
+  async disconnect(): Promise<void> {
+    if (this.disconnecting && !this.client) {
+      return
+    }
+
     this.disconnecting = true
     this.connected = false
     this.retryCount = 0
@@ -163,8 +179,15 @@ export class DiscordRPCService {
     this.pendingUpdate = null
     this.currentPresence = null
 
-    if (this.client) {
-      this.client = null
+    const client = this.client
+    this.client = null
+
+    if (client?.destroy) {
+      try {
+        await client.destroy()
+      } catch (error) {
+        console.warn("[discord-presence] Failed to destroy RPC client:", error)
+      }
     }
   }
 
@@ -226,8 +249,9 @@ export class DiscordRPCService {
     snapshot: PresenceSnapshot,
     opts: RichPresenceOptions,
     rotationIndex: number,
+    language: Language = "en",
   ): Promise<void> {
-    const activity = getActivity(snapshot, opts, rotationIndex)
+    const activity = getActivity(snapshot, opts, rotationIndex, language)
     await this.setPresence(
       truncate(activity.details, MAX_DETAILS_LENGTH),
       activity.state ? truncate(activity.state, MAX_STATE_LENGTH) : undefined,
