@@ -561,6 +561,174 @@ describe("getActivity — headline preservation", () => {
   })
 })
 
+describe("getActivity — Korean localization", () => {
+  const koOpts = defaultOpts()
+
+  test("Korean idle produces localized idle string", () => {
+    const state = makeState({
+      identity: { agent: "클라우드", model: "claude-sonnet-4-20250501" },
+      idle: true,
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+    })
+
+    const activity = getActivity(state, koOpts, 0, "ko")
+
+    // Korean idle with "클라우드" agent — particle applied
+    expect(activity.details).toContain("휴식중")
+    expect(activity.state).toBeUndefined()
+  })
+
+  test("Korean working (file spotlight) produces localized working string", () => {
+    const state = makeState({
+      identity: { agent: "아르토", model: "gpt-4o" },
+      idle: false,
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+      fileAction: {
+        file: "src/plugin.ts",
+        action: "edit",
+        operation: "Editing",
+      },
+    })
+
+    const activity = getActivity(state, koOpts, 0, "ko")
+
+    // Korean working for "아르토" — particle applied
+    expect(activity.details).toContain("작업중")
+    expect(activity.state).toContain("plugin.ts")
+  })
+
+  test("Korean task mission board produces localized working string", () => {
+    const state = makeState({
+      identity: { agent: "클라우드", model: "claude-sonnet-4-20250501" },
+      idle: false,
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+      todoSummary: {
+        total: 3,
+        completed: 1,
+        pending: 2,
+        allDone: false,
+        activeTaskLabel: "Implement dark mode",
+      },
+      fileAction: {},
+    })
+
+    const activity = getActivity(state, koOpts, 1, "ko")
+
+    expect(activity.details).toContain("작업중")
+    expect(activity.state).toMatch(/Implement dark mode/)
+  })
+
+  test("Korean session stats fallback produces localized working string", () => {
+    const state = makeState({
+      identity: { agent: "아르토", model: "gpt-4o" },
+      idle: false,
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+      fileAction: {},
+    })
+
+    const activity = getActivity(state, koOpts, 2, "ko")
+
+    expect(activity.details).toContain("작업중")
+    expect(activity.state).toBe("10개 프롬프트 • 2개 파일")
+  })
+
+  test("Korean session recap localizes headline and stats line", () => {
+    const state = makeState({
+      identity: { agent: "클라우드", model: "claude-sonnet-4-20250501" },
+      recapCache: {
+        messageCount: 27,
+        uniqueFileCount: 3,
+        filesTouched: ["src/plugin.ts", "src/utils/file-label.ts", "README.ko.md"],
+        activeDurationSeconds: 3720,
+        timestamp: Date.now(),
+      },
+      idle: false,
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+    })
+
+    const activity = getActivity(state, koOpts, 0, "ko")
+
+    expect(activity.details).toBe("세션 완료!")
+    expect(activity.state).toBe("27개 프롬프트 • 3개 파일")
+  })
+
+  test("Korean diagnostics error localizes headline and state", () => {
+    const state = makeState({
+      identity: { agent: "클라우드", model: "claude-sonnet-4-20250501" },
+      idle: false,
+      recapCache: {},
+      diagnosticsSummary: { errors: 2, warnings: 1, hints: 0, infos: 0 },
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+    })
+
+    const activity = getActivity(state, koOpts, 0, "ko")
+
+    expect(activity.details).toBe("클라우드를 작업중")
+    expect(activity.state).toBe("오류 2개, 경고 1개")
+  })
+
+  test("Korean all tasks complete localizes headline and state", () => {
+    const state = makeState({
+      identity: { agent: "클라우드", model: "claude-sonnet-4-20250501" },
+      idle: false,
+      todoSummary: { total: 5, completed: 5, pending: 0, allDone: true },
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+    })
+
+    const activity = getActivity(state, koOpts, 0, "ko")
+
+    expect(activity.details).toBe("모든 작업 완료!")
+    expect(activity.state).toBe("5/5 완료")
+  })
+
+  test("Korean diagnostics warnings localizes state", () => {
+    const warningsOnlyOpts: RichPresenceOptions = {
+      ...koOpts,
+      enableFileSpotlight: false,
+      enableMissionBoard: false,
+    }
+
+    const state = makeState({
+      identity: { agent: "클라우드", model: "claude-sonnet-4-20250501" },
+      idle: false,
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 2, hints: 0, infos: 0 },
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+      fileAction: {},
+    })
+
+    const activity = getActivity(state, warningsOnlyOpts, 0, "ko")
+
+    expect(activity.details).toBe("클라우드를 작업중")
+    expect(activity.state).toBe("경고 2개")
+  })
+
+  test("English locale still works after Korean locale is introduced", () => {
+    const state = makeState({
+      identity: { agent: "Claude", model: "claude-sonnet-4-20250501" },
+      idle: true,
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+    })
+
+    const enActivity = getActivity(state, koOpts, 0, "en")
+    const koActivity = getActivity(state, koOpts, 0, "ko")
+
+    expect(enActivity.details).toBe("Claude is idle")
+    // Non-Korean name: hasFinalConsonant returns false → topic "는"
+    expect(koActivity.details).toBe("Claude는 휴식중")
+  })
+})
+
 describe("getActivity — truncation safety", () => {
   test("long file labels are truncated before being placed in state", () => {
     const veryLongPath = `D:/coding_clone/opencode-discord-presence/src/features/presence/components/activity-rotation.test.ts`

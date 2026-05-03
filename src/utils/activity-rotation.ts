@@ -16,9 +16,10 @@
  */
 
 import type { PresenceSnapshot } from "../state/presence-state"
-import type { RichPresenceOptions } from "../types/index.js"
+import type { Language, RichPresenceOptions } from "../types/index.js"
 import { getFileIconKey } from "./file-icons.js"
 import { formatFileLabel } from "./file-label.js"
+import { getObjectParticle, getTopicParticle } from "./particle.js"
 import { getToolLabel, type ToolLabelInput } from "./tool-label.js"
 
 const MAX_STATE_LENGTH = 42
@@ -26,26 +27,49 @@ const MAX_STATE_LENGTH = 42
 /** Time period (ms) after which a recap is considered stale. */
 const RECAP_STALE_MS = 30_000
 
-/** Maps tool-label operation names to emoji for file spotlight headlines. */
-const OPERATION_EMOJI: Record<string, string> = {
-  Editing: "✍️",
-  Reading: "📖",
-  Searching: "🔍",
-  "Running tests": "🧪",
-  Building: "🔨",
-  Diagnosing: "🩺",
-  Working: "⚙️",
-  Executing: "⚡",
-}
-
-function getOperationEmoji(operation: string): string {
-  return OPERATION_EMOJI[operation] ?? "📝"
-}
-
-function formatStatsLine(metrics: PresenceSnapshot["sessionMetrics"]): string {
+function formatStatsLine(metrics: PresenceSnapshot["sessionMetrics"], language: Language): string {
   const prompts = metrics.messageCount
   const files = metrics.uniqueFilesTouched?.size ?? 0
+
+  if (language === "ko") {
+    return `${prompts}개 프롬프트 • ${files}개 파일`
+  }
+
   return `${prompts} prompts • ${files} files`
+}
+
+function formatIdleContext(
+  todoSummary: PresenceSnapshot["todoSummary"],
+  fileAction: PresenceSnapshot["fileAction"],
+  language: Language,
+): string | undefined {
+  if (todoSummary.activeTaskLabel) {
+    const label = truncateTaskLabel(todoSummary.activeTaskLabel, MAX_STATE_LENGTH)
+    return language === "ko" ? `마지막 작업: ${label}` : `Last task: ${label}`
+  }
+
+  if (fileAction.file) {
+    const label = formatFileLabel(fileAction.file)
+    return language === "ko" ? `마지막 파일: ${label}` : `Last file: ${label}`
+  }
+
+  return undefined
+}
+
+function formatDiagnosticsState(errors: number, warnings: number, language: Language): string {
+  if (language === "ko") {
+    return `오류 ${errors}개, 경고 ${warnings}개`
+  }
+
+  return `${errors} error${errors !== 1 ? "s" : ""}, ${warnings} warning${warnings !== 1 ? "s" : ""}`
+}
+
+function formatWarningsState(warnings: number, language: Language): string {
+  if (language === "ko") {
+    return `경고 ${warnings}개`
+  }
+
+  return `${warnings} warning${warnings !== 1 ? "s" : ""}`
 }
 
 function formatTaskLine(todo: PresenceSnapshot["todoSummary"]): string {
@@ -109,12 +133,14 @@ export interface ActivityPayload {
  * @param opts          - Rich presence feature flags and rotation interval
  * @param rotationIndex - Which informational card to show (0-based). Caller
  *                        should increment on each rotation tick.
+ * @param language      - Display language for localized presence strings
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: precedence dispatch inherently complex
 export function getActivity(
   snapshot: PresenceSnapshot,
   opts: RichPresenceOptions,
   rotationIndex = 0,
+  language: Language = "en",
 ): ActivityPayload {
   const {
     identity,
@@ -134,14 +160,17 @@ export function getActivity(
     const age = Date.now() - recapCache.timestamp
     if (age < RECAP_STALE_MS) {
       return {
-        details: "Session Complete!",
-        state: formatStatsLine({
-          ...sessionMetrics,
-          messageCount: recapCache.messageCount ?? sessionMetrics.messageCount,
-          uniqueFilesTouched: new Set(recapCache.filesTouched ?? []),
-          activeDurationSeconds:
-            recapCache.activeDurationSeconds ?? sessionMetrics.activeDurationSeconds,
-        }),
+        details: language === "ko" ? "세션 완료!" : "Session Complete!",
+        state: formatStatsLine(
+          {
+            ...sessionMetrics,
+            messageCount: recapCache.messageCount ?? sessionMetrics.messageCount,
+            uniqueFilesTouched: new Set(recapCache.filesTouched ?? []),
+            activeDurationSeconds:
+              recapCache.activeDurationSeconds ?? sessionMetrics.activeDurationSeconds,
+          },
+          language,
+        ),
         assets: {
           largeImageKey: "state-recap",
           largeImageText: "Session Recap",
@@ -153,8 +182,9 @@ export function getActivity(
   // ── 2. Diagnostics-error ────────────────────────────────────────────────
   if (opts.diagnostics.errorsOnly && errors > 0) {
     return {
-      details: `Working with ${agent}`,
-      state: `${errors} error${errors !== 1 ? "s" : ""}, ${warnings} warning${warnings !== 1 ? "s" : ""}`,
+      details:
+        language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`,
+      state: formatDiagnosticsState(errors, warnings, language),
       assets: {
         largeImageKey: "state-error",
         largeImageText: "Diagnostics",
@@ -164,14 +194,13 @@ export function getActivity(
 
   // ── 3. Idle ─────────────────────────────────────────────────────────────
   if (idle) {
-    const idleContext = todoSummary.activeTaskLabel
-      ? `Last task: ${truncateTaskLabel(todoSummary.activeTaskLabel, MAX_STATE_LENGTH)}`
-      : fileAction.file
-        ? `Last file: ${formatFileLabel(fileAction.file)}`
-        : undefined
+    const idleContext = formatIdleContext(todoSummary, fileAction, language)
+
+    const details =
+      language === "ko" ? `${agent}${getTopicParticle(agent)} 휴식중` : `${agent} is idle`
 
     return {
-      details: `${agent} is idle`,
+      details,
       state: idleContext,
       assets: {
         largeImageKey: "state-idle",
@@ -183,8 +212,11 @@ export function getActivity(
   // ── 4. All tasks complete ───────────────────────────────────────────────
   if (todoSummary.allDone && todoSummary.total > 0) {
     return {
-      details: "All tasks complete!",
-      state: `${todoSummary.completed}/${todoSummary.total} finished`,
+      details: language === "ko" ? "모든 작업 완료!" : "All tasks complete!",
+      state:
+        language === "ko"
+          ? `${todoSummary.completed}/${todoSummary.total} 완료`
+          : `${todoSummary.completed}/${todoSummary.total} finished`,
       assets: {
         largeImageKey: "state-complete",
         largeImageText: "All Done",
@@ -203,11 +235,13 @@ export function getActivity(
       toolName: fileAction.action,
     }
     const operation = fileAction.operation ?? getToolLabel(toolInput)
-    void getOperationEmoji(operation)
     const fileLabel = formatFileLabel(fileAction.file)
 
+    const details =
+      language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`
+
     return {
-      details: `Working with ${agent}`,
+      details,
       state: fileLabel,
       assets: {
         // Use the existing file-icons utility for language-based icons
@@ -219,8 +253,10 @@ export function getActivity(
 
   // ── 6. Task mission board ────────────────────────────────────────────────
   if (rotatingCard === "task-mission-board" && todoSummary.total > 0) {
+    const details =
+      language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`
     return {
-      details: `Working with ${agent}`,
+      details,
       state: formatTaskLine(todoSummary),
       assets: {
         largeImageKey: "task",
@@ -232,9 +268,11 @@ export function getActivity(
   // ── 7. Diagnostics-warnings (rotating informational) ───────────────────
   // Only shown when warnings > 0 and errors = 0 (otherwise step 2 pins)
   if (rotatingCard === "diagnostics-warnings" && warnings > 0 && errors === 0) {
+    const details =
+      language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`
     return {
-      details: `Working with ${agent}`,
-      state: `${warnings} warning${warnings !== 1 ? "s" : ""}`,
+      details,
+      state: formatWarningsState(warnings, language),
       assets: {
         largeImageKey: "state-warn",
         largeImageText: "Warnings",
@@ -243,9 +281,11 @@ export function getActivity(
   }
 
   // ── 8. Session stats (always available fallback) ─────────────────────────
+  const fallbackDetails =
+    language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`
   return {
-    details: `Working with ${agent}`,
-    state: formatStatsLine(sessionMetrics),
+    details: fallbackDetails,
+    state: formatStatsLine(sessionMetrics, language),
     assets: {
       largeImageKey: "stats",
       largeImageText: "Session Stats",
