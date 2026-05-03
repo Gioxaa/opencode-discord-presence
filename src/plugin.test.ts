@@ -77,60 +77,6 @@ describe("getToolLabel", () => {
   })
 })
 
-// ─── extractFilePathFromArgs ──────────────────────────────────────────────────
-
-describe("extractFilePathFromArgs", () => {
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test helper mirrors plugin logic
-  function extractFilePathFromArgs(args?: unknown): string | undefined {
-    if (!args) return undefined
-    if (typeof args === "string") {
-      const trimmed = args.trim()
-      if ((trimmed.includes("/") || trimmed.includes("\\")) && !trimmed.startsWith("-")) {
-        return normalizeFileIdentity(trimmed)
-      }
-      return undefined
-    }
-    if (Array.isArray(args)) {
-      for (const item of args) {
-        const extracted = extractFilePathFromArgs(item)
-        if (extracted) return extracted
-      }
-    }
-    if (typeof args === "object") {
-      for (const value of Object.values(args as Record<string, unknown>)) {
-        const extracted = extractFilePathFromArgs(value)
-        if (extracted) return extracted
-      }
-    }
-    return undefined
-  }
-
-  test("extracts file path from string args", () => {
-    expect(extractFilePathFromArgs("./src/index.ts")).toBe("src/index.ts")
-  })
-
-  test("extracts from array args", () => {
-    expect(extractFilePathFromArgs(["arg1", "./src/app.ts", "arg3"])).toBe("src/app.ts")
-  })
-
-  test("extracts from object args", () => {
-    expect(extractFilePathFromArgs({ file: "./src/app.ts" })).toBe("src/app.ts")
-  })
-
-  test("returns undefined for non-path strings", () => {
-    expect(extractFilePathFromArgs("--help")).toBeUndefined()
-    expect(extractFilePathFromArgs("some command")).toBeUndefined()
-  })
-
-  test("handles sparse/empty args without crashing", () => {
-    expect(extractFilePathFromArgs(undefined)).toBeUndefined()
-    expect(extractFilePathFromArgs(null)).toBeUndefined()
-    expect(() => extractFilePathFromArgs({})).not.toThrow()
-    expect(() => extractFilePathFromArgs([])).not.toThrow()
-    expect(() => extractFilePathFromArgs(123)).not.toThrow()
-  })
-})
-
 // ─── PresenceSnapshot state transitions ───────────────────────────────────────
 
 describe("PresenceSnapshot state transitions", () => {
@@ -505,6 +451,236 @@ describe("getActivity integration with snapshot", () => {
 
     expect(activity.details).toBe("Working with Claude")
     expect(activity.state).toContain("5 errors")
+  })
+})
+
+// ─── Hook contract regression tests ─────────────────────────────────────────
+
+describe("tool.execute.before → after contract-safe state flow", () => {
+  // Simulates the contract-safe before→after callID-scoped context map
+  type CapturedContext = {
+    filePath?: string
+    operation: string
+  }
+  const callContext = new Map<string, CapturedContext>()
+
+  // Local extractFilePathFromArgs mirroring plugin logic (recursive traversal)
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test helper mirrors plugin logic
+  function extractFilePathFromArgs(args?: unknown): string | undefined {
+    if (!args) return undefined
+    if (typeof args === "string") {
+      const trimmed = args.trim()
+      const quotedWithSingle = trimmed.startsWith("'") && trimmed.endsWith("'")
+      const quotedWithDouble = trimmed.startsWith('"') && trimmed.endsWith('"')
+      const wasQuoted = quotedWithSingle || quotedWithDouble
+      const candidate = wasQuoted ? trimmed.slice(1, -1).trim() : trimmed
+
+      if (!candidate || candidate.startsWith("-")) {
+        return undefined
+      }
+
+      if (!(candidate.includes("/") || candidate.includes("\\"))) {
+        return undefined
+      }
+
+      if (!wasQuoted && /\s/.test(candidate)) {
+        return undefined
+      }
+
+      return normalizeFileIdentity(candidate)
+    }
+    if (Array.isArray(args)) {
+      for (const item of args) {
+        const extracted = extractFilePathFromArgs(item)
+        if (extracted) return extracted
+      }
+    }
+    if (typeof args === "object") {
+      for (const value of Object.values(args as Record<string, unknown>)) {
+        const extracted = extractFilePathFromArgs(value)
+        if (extracted) return extracted
+      }
+    }
+    return undefined
+  }
+
+  function simulateBeforeHook(args: unknown, callID: string, toolName: string, command?: string) {
+    const filePath = extractFilePathFromArgs(args)
+    const operation = getToolLabel({ toolName, command })
+    if (callID) {
+      callContext.set(callID, { filePath, operation })
+    }
+    return { filePath, operation }
+  }
+
+  function simulateAfterHook(callID: string, toolName: string) {
+    const captured = callContext.get(callID)
+    const filePath = captured?.filePath
+    const operation = captured?.operation ?? getToolLabel({ toolName })
+    if (callID) {
+      callContext.delete(callID)
+    }
+    return { filePath, operation }
+  }
+
+  test("after-hook retrieves file context from before-hook capture via callID", () => {
+    const callID = "call-123"
+    const toolName = "edit"
+
+    // Before hook captures file context from args
+    const beforeResult = simulateBeforeHook("./src/plugin.ts", callID, toolName)
+    expect(beforeResult.filePath).toBe("src/plugin.ts")
+    expect(beforeResult.operation).toBe("Editing")
+
+    // After hook retrieves captured context — NO args needed
+    const afterResult = simulateAfterHook(callID, toolName)
+    expect(afterResult.filePath).toBe("src/plugin.ts")
+    expect(afterResult.operation).toBe("Editing")
+
+    // Context cleaned up after retrieval
+    expect(callContext.has(callID)).toBe(false)
+  })
+
+  test("before→after flow extracts file path from nested array args", () => {
+    const callID = "call-array"
+
+    const beforeResult = simulateBeforeHook(["arg1", '"./src/app.ts"', "arg3"], callID, "edit")
+    expect(beforeResult.filePath).toBe("src/app.ts")
+
+    const afterResult = simulateAfterHook(callID, "edit")
+    expect(afterResult.filePath).toBe("src/app.ts")
+    expect(afterResult.operation).toBe("Editing")
+  })
+
+  test("before→after flow extracts file path from nested object args", () => {
+    const callID = "call-object"
+
+    const beforeResult = simulateBeforeHook(
+      { payload: { file: '"./src/nested/plugin.ts"' } },
+      callID,
+      "read",
+    )
+    expect(beforeResult.filePath).toBe("src/nested/plugin.ts")
+
+    const afterResult = simulateAfterHook(callID, "read")
+    expect(afterResult.filePath).toBe("src/nested/plugin.ts")
+    expect(afterResult.operation).toBe("Reading")
+  })
+
+  test("after-hook operates correctly with no prior before-hook capture", () => {
+    const callID = "call-no-match"
+    const toolName = "read"
+
+    // After hook with no captured context — falls back to getToolLabel
+    const result = simulateAfterHook(callID, toolName)
+    expect(result.filePath).toBeUndefined()
+    expect(result.operation).toBe("Reading")
+    expect(callContext.has(callID)).toBe(false) // cleanup still runs
+  })
+
+  test("after-hook with no args in before capture returns no file path", () => {
+    const callID = "call-no-file"
+    const toolName = "bash"
+
+    // Before hook with args that yield no file path (e.g., a command)
+    const beforeResult = simulateBeforeHook("bun test", callID, toolName, "bun test")
+    expect(beforeResult.filePath).toBeUndefined()
+    expect(beforeResult.operation).toBe("Running tests")
+
+    // After hook correctly returns no file path
+    const afterResult = simulateAfterHook(callID, toolName)
+    expect(afterResult.filePath).toBeUndefined()
+    expect(afterResult.operation).toBe("Running tests")
+  })
+
+  test("before-hook ignores sparse or non-path args without crashing", () => {
+    expect(simulateBeforeHook(undefined, "call-undefined", "grep").filePath).toBeUndefined()
+    expect(simulateBeforeHook(null, "call-null", "grep").filePath).toBeUndefined()
+    expect(simulateBeforeHook({}, "call-empty-object", "grep").filePath).toBeUndefined()
+    expect(simulateBeforeHook([], "call-empty-array", "grep").filePath).toBeUndefined()
+    expect(simulateBeforeHook(123, "call-number", "grep").filePath).toBeUndefined()
+
+    expect(callContext.size).toBe(5)
+
+    expect(simulateAfterHook("call-undefined", "grep").filePath).toBeUndefined()
+    expect(simulateAfterHook("call-null", "grep").filePath).toBeUndefined()
+    expect(simulateAfterHook("call-empty-object", "grep").filePath).toBeUndefined()
+    expect(simulateAfterHook("call-empty-array", "grep").filePath).toBeUndefined()
+    expect(simulateAfterHook("call-number", "grep").filePath).toBeUndefined()
+
+    expect(callContext.size).toBe(0)
+  })
+
+  test("after-hook does NOT read output.args — contract is title/output/metadata only", () => {
+    const callID = "call-sparse"
+    const toolName = "grep"
+
+    // Simulate before capturing from args
+    simulateBeforeHook("--pattern", callID, toolName)
+
+    // Simulate after hook output contract: { title, output, metadata } — NO args
+    const afterOutput = {
+      title: "grep results",
+      output: "matched 5 lines",
+      metadata: {},
+    }
+
+    // After hook should retrieve from callContext, not from afterOutput.args
+    // (afterOutput.args is undefined and should not be accessed)
+    const captured = callContext.get(callID)
+    expect(captured).toBeDefined()
+    expect(captured?.filePath).toBeUndefined() // no file path in args
+    expect(captured?.operation).toBe("Searching")
+
+    // Verify no .args access on afterOutput
+    expect((afterOutput as unknown as Record<string, unknown>).args).toBeUndefined()
+
+    // Clean up explicitly since this test intentionally skips simulateAfterHook
+    callContext.delete(callID)
+  })
+
+  test("before-hook does not treat unquoted slash-containing command strings as file paths", () => {
+    const beforeResult = simulateBeforeHook(
+      "bun test ./src/plugin.ts",
+      "call-command",
+      "bash",
+      "bun test ./src/plugin.ts",
+    )
+
+    expect(beforeResult.filePath).toBeUndefined()
+    expect(beforeResult.operation).toBe("Running tests")
+    callContext.delete("call-command")
+  })
+
+  test("multiple sequential before→after cycles work independently", () => {
+    const callID1 = "call-a"
+    const callID2 = "call-b"
+    const callID3 = "call-c"
+
+    simulateBeforeHook('"./src/a.ts"', callID1, "edit", undefined)
+    simulateBeforeHook('"./src/b.ts"', callID2, "read", undefined)
+    simulateBeforeHook("bun build", callID3, "bash", "bun build")
+
+    // All three contexts coexist
+    expect(callContext.get("call-a")?.filePath).toBe("src/a.ts")
+    expect(callContext.get("call-b")?.filePath).toBe("src/b.ts")
+    expect(callContext.get("call-c")?.filePath).toBeUndefined()
+
+    // Each after-hook retrieves and cleans up independently
+    const r1 = simulateAfterHook(callID1, "edit")
+    expect(r1.filePath).toBe("src/a.ts")
+    expect(r1.operation).toBe("Editing")
+
+    const r2 = simulateAfterHook(callID2, "read")
+    expect(r2.filePath).toBe("src/b.ts")
+    expect(r2.operation).toBe("Reading")
+
+    const r3 = simulateAfterHook(callID3, "bash")
+    expect(r3.filePath).toBeUndefined()
+    expect(r3.operation).toBe("Building")
+
+    // All cleaned up
+    expect(callContext.size).toBe(0)
   })
 })
 

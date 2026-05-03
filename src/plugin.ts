@@ -2,7 +2,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./config.js"
-import { DiscordRPCService } from "./services/discord-rpc.js"
+import { createRecapCleanupTask, DiscordRPCService } from "./services/discord-rpc.js"
 import {
   createInitialPresenceState,
   type PresenceSnapshot,
@@ -13,8 +13,7 @@ import {
   updateRecapCache,
   updateTodoSummary,
 } from "./state/presence-state.js"
-import type { DiscordPresenceOptions, Language, RichPresenceOptions } from "./types/index.js"
-import { getObjectParticle, getTopicParticle } from "./utils/particle.js"
+import type { DiscordPresenceOptions, RichPresenceOptions } from "./types/index.js"
 import {
   createSessionMetricsState,
   createSessionRecap,
@@ -30,18 +29,6 @@ import {
   saveSessionMetrics,
 } from "./utils/session-persistence.js"
 import { getToolLabel } from "./utils/tool-label.js"
-
-let rpc: DiscordRPCService | null = null
-
-function _getPresenceDetails(agent: string, idle: boolean, language: Language): string {
-  if (language === "ko") {
-    if (idle) {
-      return `${agent}${getTopicParticle(agent)} 휴식중`
-    }
-    return `${agent}${getObjectParticle(agent)} 갈구는중`
-  }
-  return idle ? `${agent} is idle` : `Working with ${agent}`
-}
 
 async function loadConfigFile(directory: string): Promise<DiscordPresenceOptions | undefined> {
   const paths = [
@@ -76,6 +63,18 @@ interface ToolExecuteOutput {
 }
 
 /**
+ * Captured context from tool.execute.before, keyed by callID for after-hook retrieval.
+ * This is the ONLY contract-safe source of executable args for the after-hook.
+ */
+type CallIDContext = Map<
+  string,
+  {
+    filePath?: string
+    operation: string
+  }
+>
+
+/**
  * Extracts a normalized file path from tool execute args if it looks like a file path.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recursive traversal of unknown arg shape needed
@@ -83,11 +82,28 @@ function extractFilePathFromArgs(args?: unknown): string | undefined {
   if (!args) return undefined
   if (typeof args === "string") {
     const trimmed = args.trim()
-    // Looks like a path if it contains path separators and doesn't start with a flag
-    if ((trimmed.includes("/") || trimmed.includes("\\")) && !trimmed.startsWith("-")) {
-      return normalizeFileIdentity(trimmed)
+    const quotedWithSingle = trimmed.startsWith("'") && trimmed.endsWith("'")
+    const quotedWithDouble = trimmed.startsWith('"') && trimmed.endsWith('"')
+    const wasQuoted = quotedWithSingle || quotedWithDouble
+    const candidate = wasQuoted ? trimmed.slice(1, -1).trim() : trimmed
+
+    if (!candidate || candidate.startsWith("-")) {
+      return undefined
     }
-    return undefined
+
+    if (!(candidate.includes("/") || candidate.includes("\\"))) {
+      return undefined
+    }
+
+    if (!wasQuoted && /\s/.test(candidate)) {
+      return undefined
+    }
+
+    if (candidate.includes(" ")) {
+      return undefined
+    }
+
+    return normalizeFileIdentity(candidate)
   }
   if (Array.isArray(args)) {
     for (const item of args) {
@@ -125,12 +141,13 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
   const config = getConfig(fileOptions)
   if (!config.enabled) return {}
 
-  if (!rpc || !rpc.isConnected()) {
-    rpc = new DiscordRPCService(config.clientId)
-  }
-
-  // Instance-scoped presence state (replaces module-level currentAgent/currentModel)
+  // Instance-scoped RPC service and presence state.
+  let rpc: DiscordRPCService | null = new DiscordRPCService(config.clientId)
   let snapshot = createInitialPresenceState()
+
+  // Contract-safe before/after hook state: callID-scoped context captured in before, retrieved in after.
+  // This is the ONLY safe way to pass executable args from before→after since after.output lacks args.
+  const callContext: CallIDContext = new Map()
 
   // Session metrics tracked separately due to Set serialization in SessionMetrics
   let sessionMetricsState: SessionMetricsState = createSessionMetricsState()
@@ -158,7 +175,12 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
     const errors = snapshot.diagnosticsSummary.errors
     const cardCount = countRotatingCards(config.richPresence, hasWarnings, errors)
     rotationIndex = rotationIndex % cardCount
-    await rpc.setPresenceFromSnapshot(snapshotWithMetrics, config.richPresence, rotationIndex)
+    await rpc.setPresenceFromSnapshot(
+      snapshotWithMetrics,
+      config.richPresence,
+      rotationIndex,
+      config.language,
+    )
   }
 
   /**
@@ -229,8 +251,16 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
     // ── tool.execute.before ───────────────────────────────────────────────────
     "tool.execute.before": async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
       const toolName = input.tool ?? ""
+      const callID = input.callID ?? ""
       const filePath = extractFilePathFromArgs(output.args)
-      const operation = getToolLabel({ toolName })
+      // Infer operation label with command context from args for bash commands
+      const command = typeof output.args === "string" ? output.args : undefined
+      const operation = getToolLabel({ toolName, command })
+
+      // Capture context for after-hook retrieval via callID (contract-safe args path)
+      if (callID) {
+        callContext.set(callID, { filePath, operation })
+      }
 
       if (filePath) {
         snapshot = presenceReducer(
@@ -248,10 +278,21 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
     },
 
     // ── tool.execute.after ────────────────────────────────────────────────────
-    "tool.execute.after": async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
+    // IMPORTANT: output.shape is { title, output, metadata } — NO args field per contract.
+    // File context is retrieved from before-hook capture via callID (the ONLY contract-safe path).
+    "tool.execute.after": async (input: ToolExecuteInput, _output: ToolExecuteOutput) => {
       const toolName = input.tool ?? ""
-      const filePath = extractFilePathFromArgs(output.args)
-      const operation = getToolLabel({ toolName })
+      const callID = input.callID ?? ""
+
+      // Retrieve captured context from before-hook (contract-safe args source)
+      const captured = callContext.get(callID)
+      const filePath = captured?.filePath
+      const operation = captured?.operation ?? getToolLabel({ toolName })
+
+      // Clean up captured context after retrieval to avoid memory leak
+      if (callID) {
+        callContext.delete(callID)
+      }
 
       if (filePath) {
         snapshot = presenceReducer(
@@ -380,13 +421,16 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
         await pushPresence()
 
-        // Stop further reconnect attempts and clear Discord activity
-        rpc?.disconnect()
-
-        // After 30 seconds, clear activity and reset recap state
-        setTimeout(async () => {
+        const recapRpc = rpc
+        rpc = null
+        const clearRecap = () => {
           snapshot = presenceReducer(snapshot, updateRecapCache({}))
-          await rpc?.clear()
+        }
+        const cleanupRecap = createRecapCleanupTask(recapRpc, clearRecap)
+
+        // After 30 seconds, clear recap state and tear down the specific RPC session
+        setTimeout(() => {
+          void cleanupRecap()
         }, 30_000)
 
         return
