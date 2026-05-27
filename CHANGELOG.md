@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - All `[discord-presence]` lifecycle logs (connect / disconnect / failures) flow through `this.log` / `this.warn` and are gated on `config.debug` — preserved from 0.3.0, so the plugin remains silent by default after this PR merges.
 
+### Security
+
+- `richPresence.enableFileSpotlight` is now **`false` by default**. Discord broadcasts your activity to anyone viewing your profile, so the previous default (`true`) leaked working file paths from private repos. Opt in explicitly if you're working on a public repo or don't mind the exposure.
+
 ### Fixed
 
 - Empty catch blocks in RPC service — replaced with structured error logging

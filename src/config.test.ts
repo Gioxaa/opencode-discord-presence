@@ -139,9 +139,9 @@ describe("getConfig", () => {
     expect(getConfig({ debug: false }).debug).toBe(false)
   })
 
-  test("parses rich presence enableFileSpotlight option (default true)", () => {
+  test("parses rich presence enableFileSpotlight option (default false for privacy)", () => {
     const config = getConfig({})
-    expect(config.richPresence.enableFileSpotlight).toBe(true)
+    expect(config.richPresence.enableFileSpotlight).toBe(false)
   })
 
   test("parses rich presence enableMissionBoard option (default true)", () => {
@@ -241,15 +241,20 @@ describe("getConfig", () => {
 
   test("undefined richPresence key defaults all rich options", () => {
     const config = getConfig({ richPresence: undefined })
-    expect(config.richPresence.enableFileSpotlight).toBe(true)
+    expect(config.richPresence.enableFileSpotlight).toBe(false)
     expect(config.richPresence.enableMissionBoard).toBe(true)
     expect(config.richPresence.rotationIntervalSeconds).toBe(20)
   })
 
   test("partial richPresence keys get safe defaults for omitted keys", () => {
-    const config = getConfig({ richPresence: { enableFileSpotlight: false } })
+    const config = getConfig({ richPresence: { enableMissionBoard: false } })
+    expect(config.richPresence.enableMissionBoard).toBe(false)
     expect(config.richPresence.enableFileSpotlight).toBe(false)
-    expect(config.richPresence.enableMissionBoard).toBe(true)
     expect(config.richPresence.rotationIntervalSeconds).toBe(20)
+  })
+
+  test("explicit enableFileSpotlight: true opts in to file name display", () => {
+    const config = getConfig({ richPresence: { enableFileSpotlight: true } })
+    expect(config.richPresence.enableFileSpotlight).toBe(true)
   })
 })

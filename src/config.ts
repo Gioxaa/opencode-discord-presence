@@ -53,14 +53,14 @@ function parseRotationInterval(raw?: number): number {
 function parseRichPresenceOptions(raw?: Partial<RichPresenceOptions>): RichPresenceOptions {
   if (raw == null) {
     return {
-      enableFileSpotlight: true,
+      enableFileSpotlight: false,
       enableMissionBoard: true,
       rotationIntervalSeconds: DEFAULT_ROTATION_INTERVAL_SECONDS,
       diagnostics: { errorsOnly: true },
     }
   }
   return {
-    enableFileSpotlight: raw.enableFileSpotlight ?? true,
+    enableFileSpotlight: raw.enableFileSpotlight ?? false,
     enableMissionBoard: raw.enableMissionBoard ?? true,
     rotationIntervalSeconds: parseRotationInterval(raw.rotationIntervalSeconds),
     diagnostics: {

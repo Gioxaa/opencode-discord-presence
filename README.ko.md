@@ -55,7 +55,7 @@ pnpm add opencode-discord-presence
   "applicationId": "YOUR_DISCORD_APP_ID",
   "language": "ko",
   "richPresence": {
-    "enableFileSpotlight": true,
+    "enableFileSpotlight": false,
     "enableMissionBoard": true,
     "rotationIntervalSeconds": 20,
     "diagnostics": {
@@ -64,6 +64,8 @@ pnpm add opencode-discord-presence
   }
 }
 ```
+
+> ⚠️ `enableFileSpotlight`는 **기본값이 `false`**입니다. 켜면 지금 편집 중인 파일 경로가 Discord 프로필을 보는 모든 사람에게 노출됩니다. 공개 저장소이거나 노출돼도 괜찮을 때만 명시적으로 켜주세요.
 
 또는 환경변수를 사용할 수 있습니다:
 
@@ -82,7 +84,7 @@ OPENCODE_DISCORD_DEBUG=true
 | `applicationId` | `string` | (내장) | 커스텀 브랜딩을 위한 Discord Application ID |
 | `language` | `string` | `"en"` | 표시 언어 (`"en"` 또는 `"ko"`) |
 | `debug` | `boolean` | `false` | `[discord-presence]` 라이프사이클 로그(연결/해제/실패) 출력 여부. 기본값이 `false`라 OpenCode 콘솔에 아무것도 안 찍힙니다. |
-| `richPresence.enableFileSpotlight` | `boolean` | `true` | 라이브 파일 스포트라이트 카드 표시 |
+| `richPresence.enableFileSpotlight` | `boolean` | `false` | 현재 편집/읽기 중인 파일 경로를 표시. **개인정보 보호 차원에서 기본값 `false`** — Discord는 활동 정보를 프로필을 보는 모든 사람에게 노출하므로, 작업 중인 파일 경로가 비공개 저장소 내부 구조를 드러낼 수 있음. 괜찮다고 판단되면 명시적으로 켜세요. |
 | `richPresence.enableMissionBoard` | `boolean` | `true` | 태스크 미션 보드 카드 표시 |
 | `richPresence.rotationIntervalSeconds` | `number` | `20` | 정보성 카드 순환 주기 (10–60초) |
 | `richPresence.diagnostics.errorsOnly` | `boolean` | `true` | 향후/외부 diagnostics 통합을 위한 예약 옵션이며, 현재 OpenCode 플러그인 API v1에서는 비활성 상태입니다 |
@@ -109,7 +111,6 @@ cat > .discord-presence.json <<'JSON'
   "language": "ko",
   "debug": false,
   "richPresence": {
-    "enableFileSpotlight": true,
     "rotationIntervalSeconds": 15
   }
 }

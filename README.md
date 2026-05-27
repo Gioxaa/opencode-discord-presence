@@ -60,7 +60,7 @@ Create a `.discord-presence.json` file in your project root (preferred) or home 
   "applicationId": "YOUR_DISCORD_APP_ID",
   "language": "ko",
   "richPresence": {
-    "enableFileSpotlight": true,
+    "enableFileSpotlight": false,
     "enableMissionBoard": true,
     "rotationIntervalSeconds": 20,
     "diagnostics": {
@@ -69,6 +69,8 @@ Create a `.discord-presence.json` file in your project root (preferred) or home 
   }
 }
 ```
+
+> ⚠️ `enableFileSpotlight` is **off by default**: turning it on broadcasts the path of the file you're currently editing to anyone viewing your Discord profile. Only enable it if you're working on a public repo or don't mind that exposure.
 
 Or use environment variables:
 
@@ -87,7 +89,7 @@ OPENCODE_DISCORD_DEBUG=true
 | `applicationId` | `string` | (built-in) | Custom Discord Application ID for your own branding |
 | `language` | `string` | `"en"` | Display language (`"en"` or `"ko"`) |
 | `debug` | `boolean` | `false` | Emit `[discord-presence]` lifecycle logs (connect / disconnect / failures). Off by default so nothing prints in your OpenCode console. |
-| `richPresence.enableFileSpotlight` | `boolean` | `true` | Show live file spotlight card |
+| `richPresence.enableFileSpotlight` | `boolean` | `false` | Show the path of the file currently being edited/read. **Off by default for privacy** — Discord broadcasts your activity to anyone viewing your profile, so leaking working file paths can expose private repo internals. Enable explicitly if you're OK with that. |
 | `richPresence.enableMissionBoard` | `boolean` | `true` | Show task mission board card |
 | `richPresence.rotationIntervalSeconds` | `number` | `20` | How often informational cards rotate (10–60 seconds) |
 | `richPresence.diagnostics.errorsOnly` | `boolean` | `true` | Reserved for future/external diagnostics integrations; inactive with current OpenCode plugin API v1 |
@@ -114,7 +116,6 @@ cat > .discord-presence.json <<'JSON'
   "language": "ko",
   "debug": false,
   "richPresence": {
-    "enableFileSpotlight": true,
     "rotationIntervalSeconds": 15
   }
 }
