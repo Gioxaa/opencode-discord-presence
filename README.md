@@ -63,6 +63,7 @@ Create a `.discord-presence.json` file in your project root (preferred) or home 
     "enableFileSpotlight": false,
     "enableMissionBoard": true,
     "rotationIntervalSeconds": 20,
+    "mainAgentOnly": false,
     "diagnostics": {
       "errorsOnly": true
     }
@@ -92,6 +93,7 @@ OPENCODE_DISCORD_DEBUG=true
 | `richPresence.enableFileSpotlight` | `boolean` | `false` | Show the path of the file currently being edited/read. **Off by default for privacy** — Discord broadcasts your activity to anyone viewing your profile, so leaking working file paths can expose private repo internals. Enable explicitly if you're OK with that. |
 | `richPresence.enableMissionBoard` | `boolean` | `true` | Show task mission board card |
 | `richPresence.rotationIntervalSeconds` | `number` | `20` | How often informational cards rotate (10–60 seconds) |
+| `richPresence.mainAgentOnly` | `boolean` | `false` | When `true`, only `chat.message` events from the **main** session (root, no `parentID`) update Discord presence; sub-agent / task sessions are filtered out so a background planner or explore agent does not flicker the user's profile. When `false`, every chat.message overwrites presence — last writer wins, but the orchestrator still tracks busy/idle across all sessions so the "idle" text appears only when every tracked session reports idle. |
 | `richPresence.diagnostics.errorsOnly` | `boolean` | `true` | Reserved for future/external diagnostics integrations; inactive with current OpenCode plugin API v1 |
 
 For backward compatibility, the parser also accepts `discordPresence.applicationId`, but new configs should use the top-level `applicationId` shown above.

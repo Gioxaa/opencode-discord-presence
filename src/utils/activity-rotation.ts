@@ -27,15 +27,20 @@ const MAX_STATE_LENGTH = 42
 /** Time period (ms) after which a recap is considered stale. */
 const RECAP_STALE_MS = 30_000
 
-function formatStatsLine(metrics: PresenceSnapshot["sessionMetrics"], language: Language): string {
+function formatStatsLine(
+  metrics: PresenceSnapshot["sessionMetrics"],
+  language: Language,
+  model?: string,
+): string {
   const prompts = metrics.messageCount
   const files = metrics.uniqueFilesTouched?.size ?? 0
+  const modelPrefix = model ? `${model} • ` : ""
 
   if (language === "ko") {
-    return `${prompts}개 프롬프트 • ${files}개 파일`
+    return `${modelPrefix}${prompts}개 프롬프트 • ${files}개 파일`
   }
 
-  return `${prompts} prompts • ${files} files`
+  return `${modelPrefix}${prompts} prompts • ${files} files`
 }
 
 function formatIdleContext(
@@ -153,7 +158,14 @@ export function getActivity(
   } = snapshot
 
   const agent = identity.agent ?? "OpenCode"
+  const model = identity.model
   const { errors, warnings } = diagnosticsSummary
+
+  const withModel = (line: string | undefined): string | undefined => {
+    if (!model) return line
+    if (!line) return model
+    return `${model} • ${line}`
+  }
 
   // ── 1. Session recap ─────────────────────────────────────────────────────
   if (recapCache && recapCache.timestamp != null) {
@@ -184,7 +196,7 @@ export function getActivity(
     return {
       details:
         language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`,
-      state: formatDiagnosticsState(errors, warnings, language),
+      state: withModel(formatDiagnosticsState(errors, warnings, language)),
       assets: {
         largeImageKey: "state-error",
         largeImageText: "Diagnostics",
@@ -211,12 +223,13 @@ export function getActivity(
 
   // ── 4. All tasks complete ───────────────────────────────────────────────
   if (todoSummary.allDone && todoSummary.total > 0) {
+    const doneLine =
+      language === "ko"
+        ? `${todoSummary.completed}/${todoSummary.total} 완료`
+        : `${todoSummary.completed}/${todoSummary.total} finished`
     return {
       details: language === "ko" ? "모든 작업 완료!" : "All tasks complete!",
-      state:
-        language === "ko"
-          ? `${todoSummary.completed}/${todoSummary.total} 완료`
-          : `${todoSummary.completed}/${todoSummary.total} finished`,
+      state: withModel(doneLine),
       assets: {
         largeImageKey: "state-complete",
         largeImageText: "All Done",
@@ -242,7 +255,7 @@ export function getActivity(
 
     return {
       details,
-      state: fileLabel,
+      state: withModel(fileLabel),
       assets: {
         // Use the existing file-icons utility for language-based icons
         largeImageKey: getFileIconKey(fileAction.file, fileAction.language),
@@ -257,7 +270,7 @@ export function getActivity(
       language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`
     return {
       details,
-      state: formatTaskLine(todoSummary),
+      state: withModel(formatTaskLine(todoSummary)),
       assets: {
         largeImageKey: "task",
         largeImageText: "Mission Board",
@@ -272,7 +285,7 @@ export function getActivity(
       language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`
     return {
       details,
-      state: formatWarningsState(warnings, language),
+      state: withModel(formatWarningsState(warnings, language)),
       assets: {
         largeImageKey: "state-warn",
         largeImageText: "Warnings",
@@ -285,10 +298,10 @@ export function getActivity(
     language === "ko" ? `${agent}${getObjectParticle(agent)} 작업중` : `Working with ${agent}`
   return {
     details: fallbackDetails,
-    state: formatStatsLine(sessionMetrics, language),
+    state: formatStatsLine(sessionMetrics, language, model),
     assets: {
       largeImageKey: "stats",
-      largeImageText: "Session Stats",
+      largeImageText: model ? `Session Stats — ${model}` : "Session Stats",
     },
   }
 }

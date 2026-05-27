@@ -636,7 +636,7 @@ describe("getActivity — Korean localization", () => {
     const activity = getActivity(state, koOpts, 2, "ko")
 
     expect(activity.details).toContain("작업중")
-    expect(activity.state).toBe("10개 프롬프트 • 2개 파일")
+    expect(activity.state).toBe("gpt-4o • 10개 프롬프트 • 2개 파일")
   })
 
   test("Korean session recap localizes headline and stats line", () => {
@@ -671,7 +671,7 @@ describe("getActivity — Korean localization", () => {
     const activity = getActivity(state, koOpts, 0, "ko")
 
     expect(activity.details).toBe("클라우드를 작업중")
-    expect(activity.state).toBe("오류 2개, 경고 1개")
+    expect(activity.state).toBe("claude-sonnet-4-20250501 • 오류 2개, 경고 1개")
   })
 
   test("Korean all tasks complete localizes headline and state", () => {
@@ -686,7 +686,7 @@ describe("getActivity — Korean localization", () => {
     const activity = getActivity(state, koOpts, 0, "ko")
 
     expect(activity.details).toBe("모든 작업 완료!")
-    expect(activity.state).toBe("5/5 완료")
+    expect(activity.state).toBe("claude-sonnet-4-20250501 • 5/5 완료")
   })
 
   test("Korean diagnostics warnings localizes state", () => {
@@ -708,7 +708,7 @@ describe("getActivity — Korean localization", () => {
     const activity = getActivity(state, warningsOnlyOpts, 0, "ko")
 
     expect(activity.details).toBe("클라우드를 작업중")
-    expect(activity.state).toBe("경고 2개")
+    expect(activity.state).toBe("claude-sonnet-4-20250501 • 경고 2개")
   })
 
   test("English locale still works after Korean locale is introduced", () => {
@@ -742,8 +742,8 @@ describe("getActivity — truncation safety", () => {
 
     const activity = getActivity(state, defaultOpts(), 0)
 
-    // State line must not exceed 42 chars (MAX_STATE_LENGTH)
-    expect(activity.state?.length ?? 0).toBeLessThanOrEqual(42)
+    // State line must stay under Discord's 126-char limit enforced by discord-rpc.ts
+    expect(activity.state?.length ?? 0).toBeLessThanOrEqual(126)
   })
 })
 

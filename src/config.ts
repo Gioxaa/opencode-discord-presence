@@ -57,6 +57,7 @@ function parseRichPresenceOptions(raw?: Partial<RichPresenceOptions>): RichPrese
       enableMissionBoard: true,
       rotationIntervalSeconds: DEFAULT_ROTATION_INTERVAL_SECONDS,
       diagnostics: { errorsOnly: true },
+      mainAgentOnly: false,
     }
   }
   return {
@@ -66,6 +67,7 @@ function parseRichPresenceOptions(raw?: Partial<RichPresenceOptions>): RichPrese
     diagnostics: {
       errorsOnly: raw.diagnostics?.errorsOnly ?? true,
     },
+    mainAgentOnly: raw.mainAgentOnly ?? false,
   }
 }
 

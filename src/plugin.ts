@@ -3,6 +3,8 @@ import { join } from "node:path"
 import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./config.js"
 import { createRecapCleanupTask, DiscordRPCService } from "./services/discord-rpc.js"
+import { PresenceOrchestrator } from "./services/presence-orchestrator.js"
+import { SessionTracker } from "./services/session-tracker.js"
 import {
   createInitialPresenceState,
   type PresenceSnapshot,
@@ -147,6 +149,16 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
   })
   let snapshot = createInitialPresenceState()
 
+  // Multi-agent state machine: tracks busy/idle across all chat.message sessions
+  // so idle text appears only when every tracked session reports idle.
+  const orchestrator = new PresenceOrchestrator()
+
+  // Session kind tracker (main vs sub-agent). Only consulted when mainAgentOnly
+  // is enabled — primed via session.created / session.updated events for sync
+  // peek(), with async resolve() fallback through the OpenCode SDK.
+  const tracker = new SessionTracker(ctx.client)
+  const mainAgentOnly = config.richPresence.mainAgentOnly
+
   // Contract-safe before/after hook state: callID-scoped context captured in before, retrieved in after.
   // This is the ONLY safe way to pass executable args from before→after since after.output lacks args.
   const callContext: CallIDContext = new Map()
@@ -162,6 +174,35 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
   // Rotation state
   let rotationIndex = 0
   let rotationTimer: ReturnType<typeof setInterval> | null = null
+
+  /**
+   * Returns true if a sessionID is a sub-agent that should be skipped under
+   * mainAgentOnly. Uses cached peek first; if unknown, async-resolves via SDK.
+   * When mainAgentOnly is disabled, always returns false (process everything).
+   */
+  const shouldSkipSession = async (sessionID: string | undefined): Promise<boolean> => {
+    if (!mainAgentOnly || !sessionID) return false
+    const peeked = tracker.peek(sessionID)
+    if (peeked === "main") return false
+    if (peeked === "sub") return true
+    const resolved = await tracker.resolve(sessionID)
+    return resolved === "sub"
+  }
+
+  /**
+   * Synchronous fast-path skip check used in high-frequency tool hooks. When
+   * the session is "unknown" we kick off an async resolve and let THIS event
+   * through so we do not block file-spotlight updates on SDK latency.
+   */
+  const shouldSkipSessionSync = (sessionID: string | undefined): boolean => {
+    if (!mainAgentOnly || !sessionID) return false
+    const peeked = tracker.peek(sessionID)
+    if (peeked === "sub") return true
+    if (peeked === "unknown") {
+      void tracker.resolve(sessionID)
+    }
+    return false
+  }
 
   /**
    * Pushes the current snapshot + live metrics to Discord via the rotation engine.
@@ -231,20 +272,26 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
   return {
     // ── chat.message ────────────────────────────────────────────────────────────
     "chat.message": async (input, _output) => {
-      // Update agent/model identity
+      const sessionID = (input as { sessionID?: string }).sessionID ?? ""
+      if (await shouldSkipSession(sessionID)) return
+
+      const agent = input.agent ?? snapshot.identity.agent
+      const model = input.model?.modelID ?? snapshot.identity.model
+
+      const { wasIdle } = orchestrator.markBusy(sessionID, agent, model)
+      if (wasIdle) rpc?.resetSessionStart()
+
       snapshot = presenceReducer(
         snapshot,
         updateIdentity({
-          agent: input.agent ?? snapshot.identity.agent,
-          model: input.model?.modelID ?? snapshot.identity.model,
+          agent,
+          model,
         }),
       )
 
-      // Track message activity
       sessionMetricsState = recordMessageActivity(sessionMetricsState)
       await saveSessionMetrics(sessionMetricsState)
 
-      // Exit idle on new chat activity
       await exitIdleIfNeeded()
 
       await pushPresence()
@@ -252,6 +299,8 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
     // ── tool.execute.before ───────────────────────────────────────────────────
     "tool.execute.before": async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
+      if (shouldSkipSessionSync(input.sessionID)) return
+
       const toolName = input.tool ?? ""
       const callID = input.callID ?? ""
       const filePath = extractFilePathFromArgs(output.args)
@@ -283,6 +332,8 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
     // IMPORTANT: output.shape is { title, output, metadata } — NO args field per contract.
     // File context is retrieved from before-hook capture via callID (the ONLY contract-safe path).
     "tool.execute.after": async (input: ToolExecuteInput, _output: ToolExecuteOutput) => {
+      if (shouldSkipSessionSync(input.sessionID)) return
+
       const toolName = input.tool ?? ""
       const callID = input.callID ?? ""
 
@@ -315,6 +366,44 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: event dispatch pattern requires all branches
     event: async ({ event }) => {
       const eventType = event.type
+
+      // ── session.created / session.updated — prime tracker with parentID ──
+      if (eventType === "session.created" || eventType === "session.updated") {
+        const info = (event.properties as { info?: { id?: string; parentID?: string | null } })
+          ?.info
+        if (info?.id) {
+          tracker.prime(info.id, info.parentID ?? undefined)
+        }
+        return
+      }
+
+      // ── session.status — busy/idle lifecycle for the orchestrator ────────
+      if (eventType === "session.status") {
+        const props = event.properties as {
+          sessionID?: string
+          status?: { type?: string }
+        }
+        const sessionID = props.sessionID ?? ""
+        if (await shouldSkipSession(sessionID)) return
+        const statusType = props.status?.type
+        if (statusType === "idle") {
+          const { nowAllIdle, lastAgent } = orchestrator.markIdle(sessionID)
+          if (nowAllIdle) {
+            snapshot = presenceReducer(
+              snapshot,
+              updateIdentity({ agent: lastAgent || snapshot.identity.agent }),
+            )
+            snapshot = presenceReducer(snapshot, updateIdle(true))
+            await pushPresence()
+          }
+        } else if (statusType === "busy") {
+          const { wasIdle } = orchestrator.markBusy(sessionID)
+          if (wasIdle) rpc?.resetSessionStart()
+          await exitIdleIfNeeded()
+          await pushPresence()
+        }
+        return
+      }
 
       // ── file.edited ───────────────────────────────────────────────────────
       if (eventType === "file.edited") {
@@ -401,13 +490,31 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
 
       // ── session.idle ──────────────────────────────────────────────────────
       if (eventType === "session.idle") {
-        snapshot = presenceReducer(snapshot, updateIdle(true))
-        await pushPresence()
+        const sessionID = (event.properties as { sessionID?: string }).sessionID ?? ""
+        if (await shouldSkipSession(sessionID)) return
+        const { nowAllIdle, lastAgent } = orchestrator.markIdle(sessionID)
+        if (nowAllIdle) {
+          if (lastAgent) {
+            snapshot = presenceReducer(snapshot, updateIdentity({ agent: lastAgent }))
+          }
+          snapshot = presenceReducer(snapshot, updateIdle(true))
+          await pushPresence()
+        }
         return
       }
 
       // ── session.deleted ───────────────────────────────────────────────────
       if (eventType === "session.deleted") {
+        const deletedID = (event.properties as { info?: { id?: string } }).info?.id ?? ""
+        const wasMainOrTracked = !mainAgentOnly || tracker.peek(deletedID) === "main"
+        orchestrator.markIdle(deletedID)
+        tracker.forget(deletedID)
+
+        // Sub-agent deletions in mainAgentOnly mode never owned presence, so
+        // they should not trigger the session recap — that would steal the
+        // user's main-session card and tear down RPC mid-conversation.
+        if (!wasMainOrTracked) return
+
         stopRotationTimer()
 
         // Build recap from accumulated metrics

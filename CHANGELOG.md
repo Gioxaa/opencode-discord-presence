@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Restored multi-agent state machine** (`PresenceOrchestrator`) accidentally dropped during 0.4.0 PR merge. Tracks `busySessions` Set across all chat.message events and only transitions to idle text when every tracked session reports idle.
+- **`SessionTracker` service** resolves `main` vs `sub-agent` session kind via OpenCode SDK (`client.session.get`), primed by `session.created` / `session.updated` events for synchronous `peek()`. Lookups are coalesced and missing sessions are negatively cached for 5s.
+- **`richPresence.mainAgentOnly` config flag** (default `false`). When `true`, sub-agent (task tool, planner, explore, etc.) chat.message events are filtered out so the user's Discord profile stays anchored to the main session. When `false`, every chat.message overwrites presence — last-writer-wins, but idle text still requires all sessions to be idle.
+- **Model name visibility** — restored from 0.3.0. The active model (e.g. `claude-opus-4-7`) now prefixes the state line on all active cards (file spotlight, mission board, diagnostics, session stats). Idle/recap states omit the model.
+- Restored `scripts/smoke-test.ts` and `scripts/multi-window-test.ts` adapted to the new orchestrator API (state-machine returns transition deltas; plugin layer owns rendering).
+- 24 new unit tests across `presence-orchestrator.test.ts` and `session-tracker.test.ts`.
+
+### Changed
+
+- `chat.message` handler now routes through orchestrator: marks session busy, resets the Discord start timestamp on idle→busy transition, and updates the reducer-driven snapshot.
+- `event` handler now consumes `session.status` (idle/busy), `session.created`, and `session.updated` events to drive the orchestrator + tracker state machine. `session.idle` and `session.deleted` route through the orchestrator as well.
+- `session.deleted` for a sub-agent in `mainAgentOnly` mode no longer triggers the session recap card — that would steal the main session's presence display.
+- `tool.execute.before` and `tool.execute.after` skip sub-agent sessions in `mainAgentOnly` mode (synchronous fast-path with fire-and-forget SDK resolve for unknown sessions, so high-frequency file spotlight updates are not blocked on SDK latency).
+
+### Fixed
+
+- Multi-agent presence flicker — sub-agent chat.message events no longer overwrite the main agent's presence when `mainAgentOnly: true`.
+- Idle text never appearing after request completion — `session.status idle` now properly transitions to idle text when all tracked sessions report idle.
+
 ## [0.4.0] - 2026-05-27
 
 ### Added

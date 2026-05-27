@@ -20,6 +20,16 @@ export interface RichPresenceOptions {
   enableMissionBoard: boolean
   rotationIntervalSeconds: number
   diagnostics: RichPresenceDiagnosticsConfig
+  /**
+   * When true, only chat.message events from the MAIN session (root, no parentID)
+   * update Discord presence; sub-agent / task sessions are filtered out so a
+   * background planner or explore agent does not flicker the user's profile.
+   *
+   * When false (default), every chat.message overwrites presence — last writer
+   * wins. The orchestrator still tracks busy/idle across all sessions so the
+   * "X is idle" text appears only when every tracked session reports idle.
+   */
+  mainAgentOnly: boolean
 }
 
 export interface PresenceConfig {
