@@ -29,11 +29,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored plugin to use instance-scoped presence state (no more module-level mutable globals)
 - Hardened Discord RPC service with explicit disconnect, throttled updates, and stale-replay prevention
 
+### Changed
+
+- All `[discord-presence]` lifecycle logs (connect / disconnect / failures) flow through `this.log` / `this.warn` and are gated on `config.debug` — preserved from 0.3.0, so the plugin remains silent by default after this PR merges.
+
 ### Fixed
 
 - Empty catch blocks in RPC service — replaced with structured error logging
 - Potential stale replay after session deletion — guarded by `cleared` flag
 - Infinite reconnect loop — `disconnect()` now prevents further reconnect attempts
+
+## [0.3.0] - 2026-05-27
+
+### Added
+
+- `PresenceOrchestrator` class encapsulating the busy/idle state machine (testable, no module-level state leaks).
+- Monotonic update sequence on `DiscordRPCService` to drop stale `setActivity` calls during in-process races.
+- Graceful shutdown via `SIGINT` / `SIGTERM` / `exit` hooks that disconnect cleanly from Discord IPC.
+- `debug` config option (file / env `OPENCODE_DISCORD_DEBUG=true`). When **false** (default), the plugin emits **zero** logs to the OpenCode console. When **true**, `[discord-presence]` lifecycle messages are printed via `console.log` / `console.warn`.
+- 37 unit / integration tests across particle, config, discord-rpc, and presence-orchestrator.
+- `scripts/smoke-test.ts` and `scripts/multi-window-test.ts` for live Discord IPC verification.
+
+### Changed
+
+- **Silent by default.** Previous versions always printed `[discord-presence] Connected to Discord` and reconnect messages. Set `debug: true` (or `OPENCODE_DISCORD_DEBUG=true`) to restore the old behavior.
+- Every `chat.message` (main session OR sub-agent spawned by `task`) updates Rich Presence with the responding agent's name. Last writer wins — naturally surfaces whichever agent is currently active.
+- Plugin now subscribes to `session.status` events so request completion (`status.type === "idle"`) swaps the presence to the idle text. `session.idle` is still handled as a fallback.
+- Idle text (`"X is idle"` / `"X는 휴식중"`) is shown only when **every** tracked session reports idle. Single-session-idle while others are still busy keeps the latest agent's busy text.
+- Multi-window setups: every plugin instance writes its own presence directly to Discord. Last writer wins through Discord IPC, so the most-recently-active window's agent is displayed.
+- `src/plugin.ts` reduced to thin wiring (orchestrator + lifecycle hooks). Architecture lives in `src/services/`.
+
+### Fixed
+
+- Idle state is now driven by `session.status: idle` instead of waiting for `session.deleted`. The presence transitions to the idle text as soon as the request completes.
+- Reconnect / disconnect logging is silenced on intentional shutdown — no more spurious `Max retries reached` line at process exit.
 
 ## [0.1.0] - 2026-01-30
 
@@ -67,5 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Follows OpenCode plugin architecture with `@opencode-ai/plugin`
 - TDD development approach
 
-[Unreleased]: https://github.com/Puri12/opencode-discord-presence/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Puri12/opencode-discord-presence/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Puri12/opencode-discord-presence/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/Puri12/opencode-discord-presence/releases/tag/v0.1.0

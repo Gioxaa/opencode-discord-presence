@@ -142,7 +142,9 @@ export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
   if (!config.enabled) return {}
 
   // Instance-scoped RPC service and presence state.
-  let rpc: DiscordRPCService | null = new DiscordRPCService(config.clientId)
+  let rpc: DiscordRPCService | null = new DiscordRPCService(config.clientId, {
+    debug: config.debug,
+  })
   let snapshot = createInitialPresenceState()
 
   // Contract-safe before/after hook state: callID-scoped context captured in before, retrieved in after.

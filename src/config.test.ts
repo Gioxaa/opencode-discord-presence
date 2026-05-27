@@ -1,12 +1,37 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { DEFAULT_CLIENT_ID, getConfig } from "./config"
 
+const ENV_KEYS = [
+  "OPENCODE_DISCORD_ENABLED",
+  "OPENCODE_DISCORD_CLIENT_ID",
+  "OPENCODE_DISCORD_LANGUAGE",
+  "OPENCODE_DISCORD_DEBUG",
+] as const
+
 describe("getConfig", () => {
+  const saved: Record<string, string | undefined> = {}
+
+  beforeEach(() => {
+    for (const k of ENV_KEYS) {
+      saved[k] = process.env[k]
+      delete process.env[k]
+    }
+  })
+
+  afterEach(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k]
+      else process.env[k] = saved[k]
+    }
+  })
+
   test("returns correct defaults when no options or env vars provided", () => {
     const config = getConfig()
     expect(config.enabled).toBe(true)
     expect(config.clientId).toBe(DEFAULT_CLIENT_ID)
     expect(config.language).toBe("en")
+    expect(config.debug).toBe(false)
+    expect(config.richPresence).toBeDefined()
   })
 
   test("returns correct defaults when options are partially undefined", () => {
@@ -14,6 +39,7 @@ describe("getConfig", () => {
     expect(config.enabled).toBe(true)
     expect(config.clientId).toBe(DEFAULT_CLIENT_ID)
     expect(config.language).toBe("en")
+    expect(config.debug).toBe(false)
   })
 
   test("parses legacy enabled option from options object", () => {
@@ -58,9 +84,63 @@ describe("getConfig", () => {
     expect(getConfig({ language: "korean" }).language).toBe("ko")
   })
 
+  test("env vars used when file options absent", () => {
+    process.env.OPENCODE_DISCORD_ENABLED = "false"
+    process.env.OPENCODE_DISCORD_CLIENT_ID = "111"
+    process.env.OPENCODE_DISCORD_LANGUAGE = "ko"
+    process.env.OPENCODE_DISCORD_DEBUG = "true"
+    const config = getConfig()
+    expect(config.enabled).toBe(false)
+    expect(config.clientId).toBe("111")
+    expect(config.language).toBe("ko")
+    expect(config.debug).toBe(true)
+  })
+
+  test("file option wins over env", () => {
+    process.env.OPENCODE_DISCORD_CLIENT_ID = "envID"
+    process.env.OPENCODE_DISCORD_LANGUAGE = "en"
+    process.env.OPENCODE_DISCORD_DEBUG = "true"
+    const config = getConfig({ applicationId: "fileID", language: "ko", debug: false })
+    expect(config.clientId).toBe("fileID")
+    expect(config.language).toBe("ko")
+    expect(config.debug).toBe(false)
+  })
+
+  test("language fallback to 'en' for unknown values", () => {
+    expect(getConfig({ language: "fr" }).language).toBe("en")
+    expect(getConfig({ language: "" }).language).toBe("en")
+  })
+
+  test("enabled env: only literal 'false' disables", () => {
+    process.env.OPENCODE_DISCORD_ENABLED = "yes"
+    expect(getConfig().enabled).toBe(true)
+    process.env.OPENCODE_DISCORD_ENABLED = "false"
+    expect(getConfig().enabled).toBe(false)
+  })
+
+  test("debug parses env var: true/1/yes → true; false/0/no → false; default false", () => {
+    expect(getConfig().debug).toBe(false)
+    for (const v of ["true", "TRUE", "1", "yes"]) {
+      process.env.OPENCODE_DISCORD_DEBUG = v
+      expect(getConfig().debug).toBe(true)
+    }
+    for (const v of ["false", "0", "no"]) {
+      process.env.OPENCODE_DISCORD_DEBUG = v
+      expect(getConfig().debug).toBe(false)
+    }
+    process.env.OPENCODE_DISCORD_DEBUG = "garbage"
+    expect(getConfig().debug).toBe(false)
+  })
+
+  test("debug: option always wins over env", () => {
+    process.env.OPENCODE_DISCORD_DEBUG = "false"
+    expect(getConfig({ debug: true }).debug).toBe(true)
+    process.env.OPENCODE_DISCORD_DEBUG = "true"
+    expect(getConfig({ debug: false }).debug).toBe(false)
+  })
+
   test("parses rich presence enableFileSpotlight option (default true)", () => {
     const config = getConfig({})
-    expect(config.richPresence).toBeDefined()
     expect(config.richPresence.enableFileSpotlight).toBe(true)
   })
 
@@ -110,16 +190,12 @@ describe("getConfig", () => {
   })
 
   test("rotation interval clamps values above maximum to 60", () => {
-    const config = getConfig({
-      richPresence: { rotationIntervalSeconds: 100 },
-    })
+    const config = getConfig({ richPresence: { rotationIntervalSeconds: 100 } })
     expect(config.richPresence.rotationIntervalSeconds).toBe(60)
   })
 
-  test("rotation interval accepts floating point and clamps to integer", () => {
-    const config = getConfig({
-      richPresence: { rotationIntervalSeconds: 25.7 },
-    })
+  test("rotation interval accepts floating point and rounds to integer", () => {
+    const config = getConfig({ richPresence: { rotationIntervalSeconds: 25.7 } })
     expect(config.richPresence.rotationIntervalSeconds).toBe(26)
   })
 
@@ -132,7 +208,6 @@ describe("getConfig", () => {
 
   test("richPresence diagnostics field exists with errorsOnly default true", () => {
     const config = getConfig({})
-    expect(config.richPresence.diagnostics).toBeDefined()
     expect(config.richPresence.diagnostics.errorsOnly).toBe(true)
   })
 
@@ -148,6 +223,7 @@ describe("getConfig", () => {
       enabled: false,
       applicationId: "custom-id",
       language: "ko",
+      debug: true,
       richPresence: {
         enableFileSpotlight: false,
         enableMissionBoard: false,
@@ -157,6 +233,7 @@ describe("getConfig", () => {
     expect(config.enabled).toBe(false)
     expect(config.clientId).toBe("custom-id")
     expect(config.language).toBe("ko")
+    expect(config.debug).toBe(true)
     expect(config.richPresence.enableFileSpotlight).toBe(false)
     expect(config.richPresence.enableMissionBoard).toBe(false)
     expect(config.richPresence.rotationIntervalSeconds).toBe(30)

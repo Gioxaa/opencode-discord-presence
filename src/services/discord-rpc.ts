@@ -28,15 +28,21 @@ function truncate(str: string, maxLen: number): string {
 
 export { MAX_RETRIES }
 
+export interface DiscordRPCOptions {
+  debug?: boolean
+}
+
 /**
  * DiscordRPCService — hardened Discord Rich Presence client.
  *
- * Test injection points (prefixed with _ for clarity — these are part of the
- * testable surface of the class):
- *   _setConnected(connected: boolean)  — override internal connected flag
- *   _overrideClient(client: Client)     — replace the RPC client for unit tests
- *   _getState()                       — returns current internal state snapshot
- *   _setClearTimeoutimpl(fn: typeof setTimeout) — inject fake setTimeout for timer tests
+ * Logging is silent by default. Pass `{ debug: true }` to surface
+ * `[discord-presence]` lifecycle messages via `console.log` / `console.warn`.
+ *
+ * Test injection points (prefixed with _):
+ *   _setConnected(connected)  — override internal connected flag
+ *   _overrideClient(client)    — replace the RPC client for unit tests
+ *   _setTimerImpl(set, clear) — inject fake timers for debounce/reconnect tests
+ *   _getState()                — returns current internal state snapshot
  */
 export class DiscordRPCService {
   private client: Client | null = null
@@ -44,45 +50,45 @@ export class DiscordRPCService {
   private retryCount = 0
   private sessionStart: Date = new Date()
   private currentPresence: SetActivity | null = null
+  private readonly debug: boolean
 
-  // ── Lifecycle flags ───────────────────────────────────────────────────────
-  /** True when the session has been explicitly cleared and should not replay on reconnect. */
+  // ── Lifecycle flags ─────────────────────────────────────────────────────
   private cleared = false
-  /** True when disconnect() has been called — prevents further reconnect scheduling. */
   private disconnecting = false
 
-  // ── Debounce/throttle state ─────────────────────────────────────────────
+  // ── Debounce state ──────────────────────────────────────────────────────
   private pendingUpdate: SetActivity | null = null
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-  // ── Timer injection (for testing) ──────────────────────────────────────
+  // ── Reconnect timer ─────────────────────────────────────────────────────
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+  // ── Timer injection (for testing) ───────────────────────────────────────
   private _setTimeoutImpl: typeof setTimeout = setTimeout
   private _clearTimeoutImpl: typeof clearTimeout = clearTimeout
 
-  // ── Reconnect timer ──────────────────────────────────────────────────────
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  constructor(
+    private clientId: string,
+    options: DiscordRPCOptions = {},
+  ) {
+    this.debug = options.debug ?? false
+  }
 
-  constructor(private clientId: string) {}
+  // ─── Test injection points ────────────────────────────────────────────
 
-  // ─── Test injection points ───────────────────────────────────────────────
-
-  /** Override the connected flag (for testing without real RPC). */
   _setConnected(connected: boolean) {
     this.connected = connected
   }
 
-  /** Replace the Discord client (for testing without real network). */
   _overrideClient(client: Client) {
     this.client = client
   }
 
-  /** Replace setTimeout/clearTimeout (for testing debounce timers). */
   _setTimerImpl(setTimeoutImpl: typeof setTimeout, clearTimeoutImpl: typeof clearTimeout) {
     this._setTimeoutImpl = setTimeoutImpl
     this._clearTimeoutImpl = clearTimeoutImpl
   }
 
-  /** Returns a snapshot of key internal state for assertion in tests. */
   _getState() {
     return {
       connected: this.connected,
@@ -95,7 +101,7 @@ export class DiscordRPCService {
     }
   }
 
-  // ─── Connection ──────────────────────────────────────────────────────────
+  // ─── Connection ───────────────────────────────────────────────────────
 
   async connect(): Promise<boolean> {
     if (this.connected) return true
@@ -107,12 +113,11 @@ export class DiscordRPCService {
         this.client.on("ready", () => {
           this.connected = true
           this.retryCount = 0
-          console.log("[discord-presence] Connected to Discord")
+          this.log("Connected to Discord")
 
-          // Only replay presence if we have one AND the session was not cleared
           if (this.currentPresence && !this.cleared) {
             this.client?.user?.setActivity(this.currentPresence).catch((err) => {
-              console.warn("[discord-presence] Failed to replay presence:", err)
+              this.warn("Failed to replay presence:", err)
             })
           }
 
@@ -121,37 +126,22 @@ export class DiscordRPCService {
 
         this.client.on("disconnected", () => {
           this.connected = false
-          console.log("[discord-presence] Disconnected")
+          if (this.disconnecting) return
+          this.log("Disconnected")
           this.scheduleReconnect()
         })
 
         this.client.login().catch((err) => {
-          console.log("[discord-presence] Connection failed:", err?.message || err)
+          this.log("Connection failed:", err?.message || err)
           this.scheduleReconnect()
           resolve(false)
         })
       } catch (error) {
-        console.log("[discord-presence] Error:", error)
+        this.log("Error:", error)
         this.scheduleReconnect()
         resolve(false)
       }
     })
-  }
-
-  private scheduleReconnect() {
-    if (this.disconnecting) return
-    if (this.retryCount >= MAX_RETRIES) {
-      console.log("[discord-presence] Max retries reached — not scheduling further reconnects")
-      return
-    }
-    this.retryCount++
-    if (this.reconnectTimer) {
-      this._clearTimeoutImpl(this.reconnectTimer)
-    }
-    this.reconnectTimer = this._setTimeoutImpl(() => {
-      this.reconnectTimer = null
-      this.connect()
-    }, RECONNECT_DELAY)
   }
 
   /**
@@ -186,12 +176,29 @@ export class DiscordRPCService {
       try {
         await client.destroy()
       } catch (error) {
-        console.warn("[discord-presence] Failed to destroy RPC client:", error)
+        this.warn("Failed to destroy RPC client:", error)
       }
     }
   }
 
-  // ─── Presence updates (throttled/debounced) ───────────────────────────────
+  private scheduleReconnect() {
+    if (this.disconnecting) return
+    if (this.retryCount >= MAX_RETRIES) {
+      this.log("Max retries reached — not scheduling further reconnects")
+      return
+    }
+    this.retryCount++
+    if (this.reconnectTimer) {
+      this._clearTimeoutImpl(this.reconnectTimer)
+    }
+    this.reconnectTimer = this._setTimeoutImpl(() => {
+      this.reconnectTimer = null
+      this.connect()
+    }, RECONNECT_DELAY)
+    this.reconnectTimer.unref?.()
+  }
+
+  // ─── Presence updates (debounced) ─────────────────────────────────────
 
   async setPresence(
     details: string,
@@ -227,6 +234,7 @@ export class DiscordRPCService {
       this.debounceTimer = null
       this.flushPendingUpdate()
     }, DEBOUNCE_MS)
+    this.debounceTimer.unref?.()
   }
 
   private flushPendingUpdate() {
@@ -238,10 +246,10 @@ export class DiscordRPCService {
 
     try {
       this.client.user.setActivity(activity).catch((err) => {
-        console.warn("[discord-presence] Failed to update:", err)
+        this.warn("Failed to update:", err)
       })
     } catch (error) {
-      console.warn("[discord-presence] Failed to update:", error)
+      this.warn("Failed to update:", error)
     }
   }
 
@@ -259,7 +267,7 @@ export class DiscordRPCService {
     )
   }
 
-  // ─── Clear ──────────────────────────────────────────────────────────────
+  // ─── Clear ────────────────────────────────────────────────────────────
 
   async clear(): Promise<void> {
     this.cleared = true
@@ -275,11 +283,25 @@ export class DiscordRPCService {
     try {
       await this.client.user.clearActivity()
     } catch (error) {
-      console.warn("[discord-presence] Failed to clear activity:", error)
+      this.warn("Failed to clear activity:", error)
     }
+  }
+
+  resetSessionStart(): void {
+    this.sessionStart = new Date()
   }
 
   isConnected(): boolean {
     return this.connected
+  }
+
+  private log(message: string, ...args: unknown[]): void {
+    if (!this.debug) return
+    console.log(`[discord-presence] ${message}`, ...args)
+  }
+
+  private warn(message: string, ...args: unknown[]): void {
+    if (!this.debug) return
+    console.warn(`[discord-presence] ${message}`, ...args)
   }
 }

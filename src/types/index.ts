@@ -27,6 +27,7 @@ export interface PresenceConfig {
   clientId: string
   language: Language
   richPresence: RichPresenceOptions
+  debug: boolean
 }
 
 export interface DiscordPresenceOptions {
@@ -37,6 +38,7 @@ export interface DiscordPresenceOptions {
   }
   language?: string
   richPresence?: Partial<RichPresenceOptions>
+  debug?: boolean
 }
 
 export interface PresenceState {

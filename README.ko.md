@@ -69,6 +69,7 @@ pnpm add opencode-discord-presence
 OPENCODE_DISCORD_ENABLED=true
 OPENCODE_DISCORD_CLIENT_ID=YOUR_APP_ID
 OPENCODE_DISCORD_LANGUAGE=ko
+OPENCODE_DISCORD_DEBUG=true
 ```
 
 ### 설정 옵션
@@ -78,6 +79,7 @@ OPENCODE_DISCORD_LANGUAGE=ko
 | `enabled` | `boolean` | `true` | 플러그인 활성화/비활성화 |
 | `applicationId` | `string` | (내장) | 커스텀 브랜딩을 위한 Discord Application ID |
 | `language` | `string` | `"en"` | 표시 언어 (`"en"` 또는 `"ko"`) |
+| `debug` | `boolean` | `false` | `[discord-presence]` 라이프사이클 로그(연결/해제/실패) 출력 여부. 기본값이 `false`라 OpenCode 콘솔에 아무것도 안 찍힙니다. |
 | `richPresence.enableFileSpotlight` | `boolean` | `true` | 라이브 파일 스포트라이트 카드 표시 |
 | `richPresence.enableMissionBoard` | `boolean` | `true` | 태스크 미션 보드 카드 표시 |
 | `richPresence.rotationIntervalSeconds` | `number` | `20` | 정보성 카드 순환 주기 (10–60초) |

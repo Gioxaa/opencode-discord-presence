@@ -74,6 +74,7 @@ Or use environment variables:
 OPENCODE_DISCORD_ENABLED=true
 OPENCODE_DISCORD_CLIENT_ID=YOUR_APP_ID
 OPENCODE_DISCORD_LANGUAGE=ko
+OPENCODE_DISCORD_DEBUG=true
 ```
 
 ### Configuration Options
@@ -83,6 +84,7 @@ OPENCODE_DISCORD_LANGUAGE=ko
 | `enabled` | `boolean` | `true` | Enable or disable the plugin |
 | `applicationId` | `string` | (built-in) | Custom Discord Application ID for your own branding |
 | `language` | `string` | `"en"` | Display language (`"en"` or `"ko"`) |
+| `debug` | `boolean` | `false` | Emit `[discord-presence]` lifecycle logs (connect / disconnect / failures). Off by default so nothing prints in your OpenCode console. |
 | `richPresence.enableFileSpotlight` | `boolean` | `true` | Show live file spotlight card |
 | `richPresence.enableMissionBoard` | `boolean` | `true` | Show task mission board card |
 | `richPresence.rotationIntervalSeconds` | `number` | `20` | How often informational cards rotate (10–60 seconds) |

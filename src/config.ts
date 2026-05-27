@@ -69,11 +69,20 @@ function parseRichPresenceOptions(raw?: Partial<RichPresenceOptions>): RichPrese
   }
 }
 
+function parseBool(value: string | undefined): boolean | undefined {
+  if (value === undefined) return undefined
+  const v = value.toLowerCase()
+  if (v === "true" || v === "1" || v === "yes") return true
+  if (v === "false" || v === "0" || v === "no") return false
+  return undefined
+}
+
 export function getConfig(options?: DiscordPresenceOptions): PresenceConfig {
   const compatibleOptions = options as CompatibleDiscordPresenceOptions | undefined
   const envEnabled = process.env.OPENCODE_DISCORD_ENABLED
   const envClientId = process.env.OPENCODE_DISCORD_CLIENT_ID
   const envLanguage = process.env.OPENCODE_DISCORD_LANGUAGE
+  const envDebug = process.env.OPENCODE_DISCORD_DEBUG
 
   return {
     enabled: options?.enabled ?? envEnabled !== "false",
@@ -84,5 +93,6 @@ export function getConfig(options?: DiscordPresenceOptions): PresenceConfig {
       DEFAULT_CLIENT_ID,
     language: parseLanguage(options?.language ?? envLanguage),
     richPresence: parseRichPresenceOptions(options?.richPresence),
+    debug: options?.debug ?? parseBool(envDebug) ?? false,
   }
 }
