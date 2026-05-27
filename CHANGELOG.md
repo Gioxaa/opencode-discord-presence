@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-27
+
 ### Added
 
 - Config compatibility: `applicationId` remains the recommended top-level key, and `discordPresence.applicationId` is accepted as a backward-compatible fallback when parsing config files.
@@ -96,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Follows OpenCode plugin architecture with `@opencode-ai/plugin`
 - TDD development approach
 
-[Unreleased]: https://github.com/Puri12/opencode-discord-presence/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Puri12/opencode-discord-presence/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Puri12/opencode-discord-presence/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Puri12/opencode-discord-presence/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/Puri12/opencode-discord-presence/releases/tag/v0.1.0
