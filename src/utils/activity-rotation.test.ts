@@ -26,6 +26,7 @@ function defaultOpts(): RichPresenceOptions {
     enableMissionBoard: true,
     rotationIntervalSeconds: 20,
     diagnostics: { errorsOnly: true },
+    mainAgentOnly: false,
   }
 }
 
@@ -753,6 +754,7 @@ describe("resolveRotatingCard", () => {
     enableMissionBoard: true,
     rotationIntervalSeconds: 20,
     diagnostics: { errorsOnly: true },
+    mainAgentOnly: false,
   }
 
   test("returns file-spotlight, task, session-stats in order when no warnings", () => {
@@ -803,5 +805,135 @@ describe("resolveRotatingCard", () => {
     // Warnings card still appears since it precedes stats in rotation order
     expect(resolveRotatingCard(0, optsNone, true, 0)).toBe("diagnostics-warnings")
     expect(resolveRotatingCard(1, optsNone, true, 0)).toBe("session-stats")
+  })
+})
+
+describe("getActivity — model name visibility", () => {
+  const MODEL = "claude-opus-4-7"
+
+  function stateWith(model: string | undefined, overrides: Partial<PresenceSnapshot> = {}) {
+    return makeState({
+      identity: { agent: "Claude", model: model ?? "" },
+      idle: false,
+      recapCache: {},
+      diagnosticsSummary: { errors: 0, warnings: 0, hints: 0, infos: 0 },
+      todoSummary: { total: 0, completed: 0, pending: 0, allDone: false },
+      fileAction: {},
+      ...overrides,
+    })
+  }
+
+  test("session-stats card prefixes model in state line", () => {
+    const activity = getActivity(stateWith(MODEL), defaultOpts(), 2)
+    expect(activity.state).toBe(`${MODEL} • 10 prompts • 2 files`)
+  })
+
+  test("file-spotlight card prefixes model in state line", () => {
+    const activity = getActivity(
+      stateWith(MODEL, { fileAction: { file: "src/plugin.ts", action: "edit" } }),
+      defaultOpts(),
+      0,
+    )
+    expect(activity.state).toBe(`${MODEL} • plugin.ts`)
+  })
+
+  test("mission-board card prefixes model in state line", () => {
+    const activity = getActivity(
+      stateWith(MODEL, {
+        todoSummary: {
+          total: 5,
+          completed: 2,
+          pending: 3,
+          allDone: false,
+          activeTaskLabel: "Implement X",
+        },
+      }),
+      defaultOpts(),
+      1,
+    )
+    expect(activity.state).toBe(`${MODEL} • Implement X (2/5)`)
+  })
+
+  test("diagnostics-error pin prefixes model in state line", () => {
+    const activity = getActivity(
+      stateWith(MODEL, {
+        diagnosticsSummary: { errors: 3, warnings: 1, hints: 0, infos: 0 },
+      }),
+      defaultOpts(),
+      0,
+    )
+    expect(activity.state).toBe(`${MODEL} • 3 errors, 1 warning`)
+  })
+
+  test("diagnostics-warnings card prefixes model in state line", () => {
+    const activity = getActivity(
+      stateWith(MODEL, {
+        diagnosticsSummary: { errors: 0, warnings: 4, hints: 0, infos: 0 },
+      }),
+      { ...defaultOpts(), enableFileSpotlight: false, enableMissionBoard: false },
+      0,
+    )
+    expect(activity.state).toBe(`${MODEL} • 4 warnings`)
+  })
+
+  test("all-tasks-complete pin prefixes model in state line", () => {
+    const activity = getActivity(
+      stateWith(MODEL, {
+        todoSummary: { total: 5, completed: 5, pending: 0, allDone: true },
+      }),
+      defaultOpts(),
+      0,
+    )
+    expect(activity.state).toBe(`${MODEL} • 5/5 finished`)
+  })
+
+  test("idle state OMITS model — current model not relevant when idle", () => {
+    const activity = getActivity(stateWith(MODEL, { idle: true }), defaultOpts(), 0)
+    expect(activity.state).toBeUndefined()
+  })
+
+  test("session-recap OMITS model — historical card, current model irrelevant", () => {
+    const activity = getActivity(
+      stateWith(MODEL, {
+        recapCache: {
+          messageCount: 27,
+          filesTouched: ["a.ts", "b.ts", "c.ts"],
+          timestamp: Date.now(),
+        },
+      }),
+      defaultOpts(),
+      0,
+    )
+    expect(activity.state).not.toContain(MODEL)
+    expect(activity.state).toBe("27 prompts • 3 files")
+  })
+
+  test("missing model produces no prefix (graceful fallback)", () => {
+    const activity = getActivity(stateWith(""), defaultOpts(), 2)
+    expect(activity.state).toBe("10 prompts • 2 files")
+  })
+
+  test("missing model on file spotlight produces no prefix", () => {
+    const activity = getActivity(
+      stateWith("", { fileAction: { file: "src/plugin.ts", action: "edit" } }),
+      defaultOpts(),
+      0,
+    )
+    expect(activity.state).toBe("plugin.ts")
+  })
+
+  test("Korean rendering preserves model prefix", () => {
+    const activity = getActivity(stateWith(MODEL), defaultOpts(), 2, "ko")
+    expect(activity.state).toBe(`${MODEL} • 10개 프롬프트 • 2개 파일`)
+  })
+
+  test("largeImageText on session-stats card includes model", () => {
+    const activity = getActivity(stateWith(MODEL), defaultOpts(), 2)
+    expect(activity.assets?.largeImageText).toBe(`Session Stats — ${MODEL}`)
+  })
+
+  test("largeImageText on session-stats card falls back to plain label when no model", () => {
+    const activity = getActivity(stateWith(""), defaultOpts(), 2)
+    expect(activity.assets?.largeImageText).toBe("Session Stats")
   })
 })

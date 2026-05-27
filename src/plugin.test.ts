@@ -346,6 +346,7 @@ describe("getActivity integration with snapshot", () => {
     enableMissionBoard: true,
     rotationIntervalSeconds: 20,
     diagnostics: { errorsOnly: true },
+    mainAgentOnly: false,
   }
 
   test("idle state shows best available context", () => {

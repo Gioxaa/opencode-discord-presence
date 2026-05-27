@@ -57,6 +57,7 @@ pnpm add opencode-discord-presence
   "richPresence": {
     "enableFileSpotlight": false,
     "enableMissionBoard": true,
+    "mainAgentOnly": false,
     "rotationIntervalSeconds": 20,
     "diagnostics": {
       "errorsOnly": true
@@ -87,6 +88,7 @@ OPENCODE_DISCORD_DEBUG=true
 | `richPresence.enableFileSpotlight` | `boolean` | `false` | 현재 편집/읽기 중인 파일 경로를 표시. **개인정보 보호 차원에서 기본값 `false`** — Discord는 활동 정보를 프로필을 보는 모든 사람에게 노출하므로, 작업 중인 파일 경로가 비공개 저장소 내부 구조를 드러낼 수 있음. 괜찮다고 판단되면 명시적으로 켜세요. |
 | `richPresence.enableMissionBoard` | `boolean` | `true` | 태스크 미션 보드 카드 표시 |
 | `richPresence.rotationIntervalSeconds` | `number` | `20` | 정보성 카드 순환 주기 (10–60초) |
+| `richPresence.mainAgentOnly` | `boolean` | `false` | `true`로 설정하면 **메인 세션** (root, `parentID` 없음) 의 `chat.message`만 Discord presence를 갱신합니다. sub-agent / task 세션 (planner, explore 등)은 필터링되어 사용자 프로필이 백그라운드 에이전트로 깜빡이지 않습니다. `false` (기본값)이면 모든 chat.message가 presence를 덮어쓰며 (last-writer-wins), orchestrator는 여전히 모든 세션의 busy/idle을 추적하여 "휴식중" 텍스트는 모든 세션이 idle일 때만 표시됩니다. |
 | `richPresence.diagnostics.errorsOnly` | `boolean` | `true` | 향후/외부 diagnostics 통합을 위한 예약 옵션이며, 현재 OpenCode 플러그인 API v1에서는 비활성 상태입니다 |
 
 하위 호환성을 위해 파서는 `discordPresence.applicationId`도 허용하지만, 새 설정은 위 예시처럼 최상위 `applicationId`를 사용하는 것을 권장합니다.
