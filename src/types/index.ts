@@ -6,12 +6,14 @@ export interface PresenceConfig {
   enabled: boolean
   clientId: string
   language: Language
+  debug: boolean
 }
 
 export interface DiscordPresenceOptions {
   enabled?: boolean
   applicationId?: string
   language?: string
+  debug?: boolean
 }
 
 export interface PresenceState {

@@ -3,22 +3,8 @@ import { join } from "node:path"
 import type { Plugin } from "@opencode-ai/plugin"
 import { getConfig } from "./config.js"
 import { DiscordRPCService } from "./services/discord-rpc.js"
-import type { DiscordPresenceOptions, Language } from "./types/index.js"
-import { getObjectParticle, getTopicParticle } from "./utils/particle.js"
-
-let rpc: DiscordRPCService | null = null
-let currentAgent = "OpenCode"
-let currentModel = ""
-
-function getPresenceDetails(agent: string, idle: boolean, language: Language): string {
-  if (language === "ko") {
-    if (idle) {
-      return `${agent}${getTopicParticle(agent)} 휴식중`
-    }
-    return `${agent}${getObjectParticle(agent)} 갈구는중`
-  }
-  return idle ? `${agent} is idle` : `Working with ${agent}`
-}
+import { PresenceOrchestrator } from "./services/presence-orchestrator.js"
+import type { DiscordPresenceOptions } from "./types/index.js"
 
 async function loadConfigFile(directory: string): Promise<DiscordPresenceOptions | undefined> {
   const paths = [
@@ -37,41 +23,46 @@ async function loadConfigFile(directory: string): Promise<DiscordPresenceOptions
   return undefined
 }
 
+let orchestrator: PresenceOrchestrator | null = null
+let shutdownInstalled = false
+
+function installShutdownHooks(): void {
+  if (shutdownInstalled) return
+  shutdownInstalled = true
+  const shutdown = () => {
+    orchestrator?.shutdown().catch(() => {})
+  }
+  process.on("exit", shutdown)
+  process.on("SIGINT", () => {
+    shutdown()
+    process.exit(130)
+  })
+  process.on("SIGTERM", () => {
+    shutdown()
+    process.exit(143)
+  })
+}
+
 export const OpenCodeDiscordPresence: Plugin = async (ctx) => {
   const fileOptions = await loadConfigFile(ctx.directory)
   const config = getConfig(fileOptions)
   if (!config.enabled) return {}
 
-  if (!rpc || !rpc.isConnected()) {
-    rpc = new DiscordRPCService(config.clientId)
-  }
+  installShutdownHooks()
 
-  const updatePresence = async (idle = false) => {
-    if (!rpc) return
-    const details = getPresenceDetails(currentAgent, idle, config.language)
-    const state = currentModel || undefined
-    await rpc.setPresence(details, state)
-  }
-
-  const connected = rpc.isConnected() || (await rpc.connect())
-  if (connected) {
-    await updatePresence(false)
+  if (!orchestrator) {
+    orchestrator = new PresenceOrchestrator({
+      rpc: new DiscordRPCService(config.clientId, { debug: config.debug }),
+      language: config.language,
+    })
   }
 
   return {
-    "chat.message": async (input, _output) => {
-      if (input.agent) currentAgent = input.agent
-      if (input.model?.modelID) currentModel = input.model.modelID
-      await updatePresence(false)
+    "chat.message": async (input) => {
+      await orchestrator?.onChatMessage(input)
     },
-
     event: async ({ event }) => {
-      if (event.type === "session.idle") {
-        await updatePresence(true)
-      }
-      if (event.type === "session.deleted") {
-        await rpc?.clear()
-      }
+      await orchestrator?.onEvent(event)
     },
   }
 }
