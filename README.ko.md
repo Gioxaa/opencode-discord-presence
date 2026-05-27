@@ -33,19 +33,21 @@ pnpm add opencode-discord-presence
 
 ## 빠른 시작
 
-`opencode.json`에 플러그인을 추가하세요:
+`opencode.json`에 플러그인을 등록하세요:
 
 ```json
 {
-  "plugins": ["opencode-discord-presence"]
+  "plugin": ["opencode-discord-presence"]
 }
 ```
 
 끝! 플러그인이 자동으로 Discord에 연결되어 세션 상태를 표시합니다.
 
+> `opencode.json`은 플러그인을 **등록**하는 용도일 뿐, 플러그인 설정은 모두 `.discord-presence.json` 또는 환경변수로 관리합니다. 아래 [설정](#설정) 섹션 참고.
+
 ## 설정
 
-홈 디렉토리 또는 프로젝트 루트에 `.discord-presence.json` 파일을 생성하세요:
+프로젝트 루트(권장) 또는 홈 디렉토리에 `.discord-presence.json` 파일을 생성하세요:
 
 ```json
 {
@@ -87,11 +89,34 @@ OPENCODE_DISCORD_DEBUG=true
 
 하위 호환성을 위해 파서는 `discordPresence.applicationId`도 허용하지만, 새 설정은 위 예시처럼 최상위 `applicationId`를 사용하는 것을 권장합니다.
 
-### 설정 파일 우선순위
+### 설정값이 읽히는 순서
 
-1. 프로젝트 디렉토리: `.discord-presence.json`
-2. 홈 디렉토리: `~/.discord-presence.json`
-3. 환경변수
+각 옵션은 아래 순서대로 처음 정의된 값을 사용합니다:
+
+1. **`<프로젝트루트>/.discord-presence.json`** — `opencode.json` 옆에 두는 프로젝트별 설정. 프로젝트마다 다른 언어/디버그 옵션을 쓰고 싶을 때 권장.
+2. **`~/.discord-presence.json`** — 모든 OpenCode 프로젝트에서 공통으로 쓰는 전역 기본값.
+3. **환경변수** — `OPENCODE_DISCORD_ENABLED`, `OPENCODE_DISCORD_CLIENT_ID`, `OPENCODE_DISCORD_LANGUAGE`, `OPENCODE_DISCORD_DEBUG`. 일회성 오버라이드에 편함 (`OPENCODE_DISCORD_DEBUG=true opencode …`).
+4. **내장 기본값** — 조용한 모드(`debug: false`), 영어, 내장 Discord App ID.
+
+> `opencode.json` 자체는 이 플러그인의 **설정 소스가 아닙니다**. `opencode.json` 안에 `discordPresence: { … }`를 적어도 읽히지 않으니, 설정은 반드시 `.discord-presence.json`에 넣어주세요. (OpenCode 공용 스키마가 플러그인별 필드를 허용하지 않기 때문에, `opencode.json`을 깨끗하게 유지하는 의도입니다.)
+
+### 프로젝트별 예시
+
+```bash
+# 어느 OpenCode 프로젝트든, opencode.json 옆에:
+cat > .discord-presence.json <<'JSON'
+{
+  "language": "ko",
+  "debug": false,
+  "richPresence": {
+    "enableFileSpotlight": true,
+    "rotationIntervalSeconds": 15
+  }
+}
+JSON
+```
+
+OpenCode를 재시작하면 다음 chat 메시지부터 새 설정이 반영됩니다.
 
 ## 커스텀 Discord Application
 

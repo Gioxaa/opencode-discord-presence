@@ -38,19 +38,21 @@ pnpm add opencode-discord-presence
 
 ## Quick Start
 
-Add the plugin to your `opencode.json`:
+Register the plugin in your `opencode.json`:
 
 ```json
 {
-  "plugins": ["opencode-discord-presence"]
+  "plugin": ["opencode-discord-presence"]
 }
 ```
 
 That's it! The plugin will automatically connect to Discord and display your session status.
 
+> `opencode.json` only **registers** the plugin. All plugin settings live in `.discord-presence.json` or environment variables — see [Configuration](#configuration) below.
+
 ## Configuration
 
-Create a `.discord-presence.json` file in your home directory or project root:
+Create a `.discord-presence.json` file in your project root (preferred) or home directory:
 
 ```json
 {
@@ -92,11 +94,34 @@ OPENCODE_DISCORD_DEBUG=true
 
 For backward compatibility, the parser also accepts `discordPresence.applicationId`, but new configs should use the top-level `applicationId` shown above.
 
-### Config File Priority
+### Where the plugin reads from
 
-1. Project directory: `.discord-presence.json`
-2. Home directory: `~/.discord-presence.json`
-3. Environment variables
+Each setting is resolved in this order — the first defined value wins:
+
+1. **`<projectRoot>/.discord-presence.json`** — per-project config, lives next to your `opencode.json`. Recommended for project-specific tweaks (e.g. a Korean idle string for a Korean codebase).
+2. **`~/.discord-presence.json`** — your global default, used by every OpenCode project.
+3. **Environment variables** — `OPENCODE_DISCORD_ENABLED`, `OPENCODE_DISCORD_CLIENT_ID`, `OPENCODE_DISCORD_LANGUAGE`, `OPENCODE_DISCORD_DEBUG`. Convenient for one-off overrides (`OPENCODE_DISCORD_DEBUG=true opencode …`).
+4. **Built-in defaults** — silent (`debug: false`), English, shared Discord App ID.
+
+> `opencode.json` itself is **not** a config source for this plugin. Putting `discordPresence: { … }` inside `opencode.json` will not be picked up; use `.discord-presence.json` instead. (The shared OpenCode schema does not allow plugin-specific fields, so this keeps your `opencode.json` valid.)
+
+### Per-project example
+
+```bash
+# In any OpenCode project, alongside opencode.json:
+cat > .discord-presence.json <<'JSON'
+{
+  "language": "ko",
+  "debug": false,
+  "richPresence": {
+    "enableFileSpotlight": true,
+    "rotationIntervalSeconds": 15
+  }
+}
+JSON
+```
+
+Restart OpenCode and the new settings take effect on the next chat message.
 
 ## Custom Discord Application
 
