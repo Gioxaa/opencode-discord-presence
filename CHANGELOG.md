@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-27
+
 ### Added
 
 - **Restored multi-agent state machine** (`PresenceOrchestrator`) accidentally dropped during 0.4.0 PR merge. Tracks `busySessions` Set across all chat.message events and only transitions to idle text when every tracked session reports idle.
@@ -14,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`richPresence.mainAgentOnly` config flag** (default `false`). When `true`, sub-agent (task tool, planner, explore, etc.) chat.message events are filtered out so the user's Discord profile stays anchored to the main session. When `false`, every chat.message overwrites presence — last-writer-wins, but idle text still requires all sessions to be idle.
 - **Model name visibility** — restored from 0.3.0. The active model (e.g. `claude-opus-4-7`) now prefixes the state line on all active cards (file spotlight, mission board, diagnostics, session stats). Idle/recap states omit the model.
 - Restored `scripts/smoke-test.ts` and `scripts/multi-window-test.ts` adapted to the new orchestrator API (state-machine returns transition deltas; plugin layer owns rendering).
-- 24 new unit tests across `presence-orchestrator.test.ts` and `session-tracker.test.ts`.
+- 37 new unit tests across `presence-orchestrator.test.ts`, `session-tracker.test.ts`, and dedicated model-display assertions in `activity-rotation.test.ts`.
 
 ### Changed
 
@@ -123,7 +125,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Follows OpenCode plugin architecture with `@opencode-ai/plugin`
 - TDD development approach
 
-[Unreleased]: https://github.com/Puri12/opencode-discord-presence/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Puri12/opencode-discord-presence/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Puri12/opencode-discord-presence/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Puri12/opencode-discord-presence/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Puri12/opencode-discord-presence/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/Puri12/opencode-discord-presence/releases/tag/v0.1.0
